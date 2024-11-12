@@ -71,6 +71,12 @@ def save_to_db(data):
     cursor.close()
     conn.close()
 
+
+def is_persian(text):
+    """Checks if the text contains Persian characters."""
+    return any("\u0600" <= char <= "\u06FF" for char in text)
+
+
 # Function to scrape app information
 def give_information_app_first(app_name, url):
     chrome_options = Options()
@@ -83,40 +89,63 @@ def give_information_app_first(app_name, url):
 
     driver = webdriver.Chrome(options=chrome_options)
     # url_fa = url.split('?l=')[0]
-    driver.get(url)
 
-    time.sleep(5)
+    retry_count = 0
+    max_retries = 5  # Set a limit to retries
+
+    while retry_count < max_retries:
+
+        driver.get(url)
+
+        # time.sleep(5)
 
     # Wait for page elements to load
-    wait = WebDriverWait(driver, 10)
-    wait.until(EC.presence_of_element_located((By.CLASS_NAME, 'AppCommentsList__loadmore')))
-    App_info_zone = driver.find_element(By.CLASS_NAME, 'AppDetails__col')
-    
-    # Scrape the app details
-    App_Name = App_info_zone.find_element(By.CLASS_NAME, 'AppName').text
-    App_Name_Company = App_info_zone.find_element(By.CLASS_NAME, 'DetailsPageHeader__company').text
-    App_Version = App_info_zone.find_element(By.CLASS_NAME, 'DetailsPageHeader__subtitles').text
-    App_Install = App_info_zone.find_elements(By.CLASS_NAME, 'InfoCube__content')[0].text
-    App_Totoal_Rate = App_info_zone.find_elements(By.CLASS_NAME, 'InfoCube__title')[1].text
-    App_Avrage_Rate = App_info_zone.find_elements(By.CLASS_NAME, 'InfoCube__content')[1].text
-    App_Category = App_info_zone.find_elements(By.CLASS_NAME, 'InfoCube__content')[2].text
-    App_Size = App_info_zone.find_elements(By.CLASS_NAME, 'InfoCube__content')[3].text
-    App_Last_Update = App_info_zone.find_elements(By.CLASS_NAME, 'InfoCube__content')[4].text
-    App_Img = App_info_zone.find_element(By.TAG_NAME, 'img').get_attribute('src')
+        wait = WebDriverWait(driver, 10)
+        wait.until(EC.presence_of_element_located((By.CLASS_NAME, 'AppCommentsList__loadmore')))
+        App_info_zone = driver.find_element(By.CLASS_NAME, 'AppDetails__col')
+        App_Name = App_info_zone.find_element(By.CLASS_NAME, 'AppName').text
 
-    # Format data for database insertion
-    APP_INFO = {
-        'App_Name': App_Name,
-        'App_Img': App_Img,
-        'App_Name_Company': App_Name_Company,
-        'App_Version': App_Version,
-        'App_Totoal_Rate': App_Totoal_Rate,
-        'App_Avrage_Rate': App_Avrage_Rate,
-        'App_Install': App_Install,
-        'App_Category': App_Category,
-        'App_Size': App_Size,
-        'App_Last_Update': App_Last_Update
-    }
+# Check if the essential fields are in Persian
+        if is_persian(App_Name):
+            print("App information loaded in Persian.")
+            break  # Exit the loop if the text is in Persian
+        else:
+            print("App information is in English; retrying...")
+            retry_count += 1
+            time.sleep(2)  # Wait a bit before retrying
+            driver.refresh()  # Refresh the page
+
+    if retry_count == max_retries:
+        print(f"Failed to load Persian information for {url} after several attempts.")
+    
+    # Proceed with saving only if Persian content was detected
+    if is_persian(App_Name):
+
+        # Scrape the app details
+        
+        App_Name_Company = App_info_zone.find_element(By.CLASS_NAME, 'DetailsPageHeader__company').text
+        App_Version = App_info_zone.find_element(By.CLASS_NAME, 'DetailsPageHeader__subtitles').text
+        App_Install = App_info_zone.find_elements(By.CLASS_NAME, 'InfoCube__content')[0].text
+        App_Totoal_Rate = App_info_zone.find_elements(By.CLASS_NAME, 'InfoCube__title')[1].text
+        App_Avrage_Rate = App_info_zone.find_elements(By.CLASS_NAME, 'InfoCube__content')[1].text
+        App_Category = App_info_zone.find_elements(By.CLASS_NAME, 'InfoCube__content')[2].text
+        App_Size = App_info_zone.find_elements(By.CLASS_NAME, 'InfoCube__content')[3].text
+        App_Last_Update = App_info_zone.find_elements(By.CLASS_NAME, 'InfoCube__content')[4].text
+        App_Img = App_info_zone.find_element(By.TAG_NAME, 'img').get_attribute('src')
+
+        # Format data for database insertion
+        APP_INFO = {
+            'App_Name': App_Name,
+            'App_Img': App_Img,
+            'App_Name_Company': App_Name_Company,
+            'App_Version': App_Version,
+            'App_Totoal_Rate': App_Totoal_Rate,
+            'App_Avrage_Rate': App_Avrage_Rate,
+            'App_Install': App_Install,
+            'App_Category': App_Category,
+            'App_Size': App_Size,
+            'App_Last_Update': App_Last_Update
+        }
 
     driver.quit()
 
@@ -135,5 +164,4 @@ def main():
 
 
 if __name__ == "__main__":
-    
     main()
