@@ -61,6 +61,12 @@ def save_to_db(data):
     ))
     conn.commit()
 
+  # Reset the sequence after insert to ensure sequential IDs
+    reset_query = """
+    SELECT setval(pg_get_serial_sequence('app_info', 'app_id'), COALESCE(MAX(app_id), 1)) FROM app_info;
+    """
+    cursor.execute(reset_query)
+    conn.commit()
 
     cursor.close()
     conn.close()
@@ -129,6 +135,5 @@ def main():
 
 
 if __name__ == "__main__":
-    # url = 'https://cafebazaar.ir/app/com.pmb.mobile'
-    # give_information_app_first(url)
+    
     main()
