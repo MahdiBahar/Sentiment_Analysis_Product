@@ -39,8 +39,8 @@ def save_to_db(data):
     insert_query = """
     INSERT INTO app_info (
         app_name, app_img, app_name_company, app_version, app_total_rate, 
-        app_average_rate, app_install, app_category, app_size, app_last_update
-    ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+        app_average_rate, app_install, app_category, app_size, app_last_update, app_url
+    ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s,%s)
     ON CONFLICT (app_name)
     DO UPDATE SET
         app_img = EXCLUDED.app_img,
@@ -51,7 +51,8 @@ def save_to_db(data):
         app_install = EXCLUDED.app_install,
         app_category = EXCLUDED.app_category,
         app_size = EXCLUDED.app_size,
-        app_last_update = EXCLUDED.app_last_update;
+        app_last_update = EXCLUDED.app_last_update,
+          app_url = EXCLUDED.app_url;;
 
     """
     cursor.execute(insert_query, (
@@ -144,7 +145,8 @@ def give_information_app_first(app_name, url):
             'App_Install': App_Install,
             'App_Category': App_Category,
             'App_Size': App_Size,
-            'App_Last_Update': App_Last_Update
+            'App_Last_Update': App_Last_Update,
+            'App_URL': url  # Add the URL here
         }
 
     driver.quit()
