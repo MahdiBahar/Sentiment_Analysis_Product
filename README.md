@@ -6,6 +6,7 @@ sudo service postgresql stop
 1) Build docker-compose
 
 sudo docker-compose build
+
 2) up every service
 
 sudo docker-compose up app_scraper -d
