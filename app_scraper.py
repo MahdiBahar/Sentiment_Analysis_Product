@@ -21,7 +21,6 @@ def connect_db():
     return conn
 
 # Function to get URLs from the `urls_to_crawl` table
-## public.url_to_crawl (crawl_app_name, crawl_url)
 def fetch_urls_to_crawl():
     conn = connect_db()
     cursor = conn.cursor()
@@ -52,13 +51,13 @@ def save_to_db(data):
         app_category = EXCLUDED.app_category,
         app_size = EXCLUDED.app_size,
         app_last_update = EXCLUDED.app_last_update,
-          app_url = EXCLUDED.app_url;;
+          app_url = EXCLUDED.app_url;
 
     """
     cursor.execute(insert_query, (
         data['App_Name'], data['App_Img'], data['App_Name_Company'], data['App_Version'],
         data['App_Totoal_Rate'], data['App_Avrage_Rate'], data['App_Install'],
-        data['App_Category'], data['App_Size'], data['App_Last_Update']
+        data['App_Category'], data['App_Size'], data['App_Last_Update'], data['App_URL']
     ))
     conn.commit()
 
@@ -89,7 +88,6 @@ def give_information_app_first(app_name, url):
     chrome_options.add_argument("--incognito")  
 
     driver = webdriver.Chrome(options=chrome_options)
-    # url_fa = url.split('?l=')[0]
 
     retry_count = 0
     max_retries = 5  # Set a limit to retries
@@ -97,9 +95,6 @@ def give_information_app_first(app_name, url):
     while retry_count < max_retries:
 
         driver.get(url)
-
-        # time.sleep(5)
-
     # Wait for page elements to load
         wait = WebDriverWait(driver, 10)
         wait.until(EC.presence_of_element_located((By.CLASS_NAME, 'AppCommentsList__loadmore')))
@@ -163,7 +158,6 @@ def main():
     for crawl_app_name, crawl_url in urls_to_crawl:
         print(f"Scraping {crawl_app_name} at {crawl_url}")
         give_information_app_first(crawl_app_name, crawl_url)
-
 
 if __name__ == "__main__":
     main()
