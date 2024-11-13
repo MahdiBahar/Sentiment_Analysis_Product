@@ -22,7 +22,7 @@ services:
       retries: 5
   
   
-  scraper:
+  app_scraper:
     build: .
     environment:
       DB_HOST: db                    # Hostname for PostgreSQL (the `db` service name within Docker Compose)
@@ -33,6 +33,7 @@ services:
     depends_on:
       db:
         condition: service_healthy # Ensures that the 'db' service starts before 'scraper'
+    command: ["python", "-u", "app_scraper.py"]  # Script to run for `app_scraper`
 
 
 volumes:
