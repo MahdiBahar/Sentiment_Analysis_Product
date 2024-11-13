@@ -14,6 +14,7 @@ CREATE TABLE IF NOT EXISTS public.app_info
     app_category character varying(200),
     app_size character varying(50),
     app_last_update text,
+    app_url text,
     UNIQUE (app_name), -- to solve the problem in recording once
     CONSTRAINT apps_pkey PRIMARY KEY (app_id)
 );

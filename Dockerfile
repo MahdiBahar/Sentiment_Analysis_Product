@@ -25,4 +25,4 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY . .
 
 # Set entry point
-CMD ["python", "Crawling_test.py"]
+CMD ["python", "app_scraper.py"]
