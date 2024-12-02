@@ -12,17 +12,22 @@ from tqdm import tqdm
 from datetime import datetime
 import os
 import random
+# to solve time out problem
+from tenacity import retry, wait_exponential, stop_after_attempt
+from selenium.common.exceptions import TimeoutException
+
 
 # Database connection function
 def connect_db():
     conn = psycopg2.connect(
         host=os.getenv("DB_HOST", "localhost"),
-        database=os.getenv("DB_NAME", "MEC_Sentiment"),
+        database=os.getenv("DB_NAME", "MEC-Sentiment"),
         user=os.getenv("DB_USER", "postgres"),
         password=os.getenv("DB_PASS", "postgres"),
         port=os.getenv("DB_PORT", "5432")
     )
     return conn
+
 
 # Fetch app_ids and app_urls from the app_info table
 def fetch_app_urls_to_crawl():
@@ -34,23 +39,35 @@ def fetch_app_urls_to_crawl():
     conn.close()
     return apps
 
-# Function to save comments in batches
+
+ #Function to save comments in batches with uniqueness enforced on `comment_idd`
 def save_comments_to_db(comments):
     if not comments:
         return
     conn = connect_db()
     cursor = conn.cursor()
     insert_query = """
-    INSERT INTO public.comment (app_id, user_name, comment_text, comment_rating, comment_date, iid, sentiment_processed)
-    VALUES (%s, %s, %s, %s, %s, %s, %s)
-    ON CONFLICT (iid) DO NOTHING;
+    INSERT INTO public.comment (app_id, user_name, comment_text, comment_rating, comment_date, sentiment_processed, iid, comment_idd)
+    VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+    ON CONFLICT (comment_idd) DO NOTHING;
     """
     cursor.executemany(insert_query, comments)
     conn.commit()
+        # Reset the sequence after insert to ensure sequential IDs
+    reset_query = """
+    SELECT setval(pg_get_serial_sequence('public.comment', 'comment_id'), COALESCE(MAX(comment_id), 1)) FROM public.comment;
+    """
+    cursor.execute(reset_query)
+    conn.commit()
+    
     cursor.close()
     conn.close()
 
 
+# Retry with exponential backoff for driver.get
+@retry(wait=wait_exponential(multiplier=1, min=4, max=10), stop=stop_after_attempt(3), reraise=True)
+def load_page(driver, url):
+    driver.get(url)
 
 def crawl_comments(app_id, app_url):
     chrome_options = Options()
@@ -65,7 +82,17 @@ def crawl_comments(app_id, app_url):
 
     chrome_service = Service("/usr/bin/chromedriver")
     driver = webdriver.Chrome(service=chrome_service, options=chrome_options)
-    driver.get(app_url.split('?l=')[0] + '?l=en')
+    
+    # Set a longer page load timeout
+    driver.set_page_load_timeout(350)
+
+    try:
+        load_page(driver, app_url.split('?l=')[0] + '?l=en')
+    except TimeoutException:
+        print(f"Failed to load the page for app ID {app_id} after retries.")
+        driver.quit()
+        return
+    
     wait = WebDriverWait(driver, 10)
     
     # Scroll down to load initial comments
@@ -73,7 +100,7 @@ def crawl_comments(app_id, app_url):
     while True:
         # Restart logic without reloading the URL
         click_count = 0
-        while click_count < 50:
+        while click_count < 126:
             try:
                 # Random delay to avoid detection
                 time.sleep(random.uniform(2, 5))
@@ -82,7 +109,7 @@ def crawl_comments(app_id, app_url):
                 click_count += 1
                 total_clicks += 1
                 print(f"Clicked 'Load more' {total_clicks} times.")
-                time.sleep(3)  # Allow time for comments to load
+                time.sleep(10)  # Allow time for comments to load
             except Exception:
                 print("No more 'Load more' button found, or end of comments reached.")
                 break
@@ -93,7 +120,7 @@ def crawl_comments(app_id, app_url):
         driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")  # Scroll to where we left off
 
         # Re-attempt "Load more" after session reset
-        if click_count < 50:  # If less than 50 clicks in this cycle, we assume we're done
+        if click_count < 126:  # If click_count is less than the click numbers in this cycle, we assume we're done
             break
 
     # Extract comments after all clicks are complete
@@ -107,6 +134,15 @@ def crawl_comments(app_id, app_url):
             username = comment.find_element(By.CLASS_NAME, 'AppComment__username').text
             comment_text = comment.find_element(By.CLASS_NAME, 'AppComment__body').text
             date = comment.find_element(By.CLASS_NAME, 'AppComment__meta').text
+
+            try:
+                # Get the `id` attribute and directly convert it to an integer
+                comment_idd = int(comment.get_attribute('id'))
+               
+            except ValueError as e:
+                print(f"Failed to convert comment ID to integer: {e}")
+            except Exception as e:
+                print(f"Error extracting comment ID: {e}")
 
             # Extract rating if available
             try:
@@ -124,7 +160,7 @@ def crawl_comments(app_id, app_url):
                 converted_date = datetime.now().strftime("%Y-%m-%d")
 
             # Append data to batch list
-            comments_data.append((app_id, username, comment_text, rating, converted_date, iid, False))
+            comments_data.append((app_id, username, comment_text, rating, converted_date,  False, iid, comment_idd))
 
         except Exception as e:
             print(f"Error processing a comment for app ID {app_id}: {e}")
@@ -133,12 +169,13 @@ def crawl_comments(app_id, app_url):
     save_comments_to_db(comments_data)
     driver.quit()
 
+
 # Main function for crawling comments
 def main():
     apps = fetch_app_urls_to_crawl()
     for app_id, app_url in apps:
         print(f"Crawling comments for app at {app_url}")
-        if app_id >= 28:  # Start from a specific app ID if needed
+        if (app_id == 28):  # Start from a specific app ID if needed
             crawl_comments(app_id, app_url)
 
 if __name__ == "__main__":
