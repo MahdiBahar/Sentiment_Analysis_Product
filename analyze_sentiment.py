@@ -1,14 +1,12 @@
 import psycopg2
 import os
-from transformers import MT5ForConditionalGeneration, MT5Tokenizer,pipeline
+from transformers import MT5ForConditionalGeneration, MT5Tokenizer, pipeline
 from googletrans import Translator
-
 
 # Load the tokenizer and model
 model_name = "persiannlp/mt5-base-parsinlu-sentiment-analysis"
 tokenizer = MT5Tokenizer.from_pretrained(model_name)
 model = MT5ForConditionalGeneration.from_pretrained(model_name)
-
 
 # Load the second model (Hugging Face pipeline)
 classifier = pipeline("sentiment-analysis")
@@ -31,7 +29,7 @@ def fetch_comments_to_analyze(app_id):
     conn = connect_db()
     cursor = conn.cursor()
     query = """
-        SELECT comment_id, comment_text , comment_rating
+        SELECT comment_id, comment_text, comment_rating
         FROM comment 
         WHERE app_id = %s  
         ;
@@ -68,37 +66,37 @@ def run_second_model(comment_text):
     result = classifier(translated_text)
     return result[0]["label"]  # Example output: "POSITIVE", "NEGATIVE", "NEUTRAL"
 
-
-
-# Main function to fetch comments for a specific app_id and update sentiments
+# Analyze and update sentiment for each comment
 def analyze_and_update_sentiment(app_id):
     comments = fetch_comments_to_analyze(app_id)
     for comment_id, comment_text, comment_rating in comments:
         try:
             sentiment_result = run_model(comment_text)
 
-            # If the first model returns "non-sentiment", run the second model
+            # If the first model returns "no sentiment expressed", run the second model
             if sentiment_result.lower() == "no sentiment expressed":
                 second_model_result = run_second_model(comment_text)
 
-             # Apply conditional update logic based on second model result and rating
-                if second_model_result == "NEGATIVE" and comment_rating == 1 :
+                # Apply conditional update logic based on second model result and rating
+                if second_model_result == "NEGATIVE" and comment_rating == 1:
                     sentiment_result = "negative"
                 elif second_model_result == "POSITIVE" and comment_rating == 5:
                     sentiment_result = "positive"
                 # Otherwise, retain "no sentiment expressed"
-
-
-
 
             update_sentiment(comment_id, sentiment_result)
             print(f"Updated comment {comment_id} with sentiment: {sentiment_result}")
         except Exception as e:
             print(f"Error processing comment {comment_id}: {e}")
 
+# Main function to process multiple app_ids
+def main(app_ids):
+    for app_id in app_ids:
+        print(f"Processing app_id: {app_id}")
+        analyze_and_update_sentiment(app_id)
+
 if __name__ == "__main__":
-    app_id = int(os.getenv("APP_ID", "28"))  # Fetch app_id from environment variables (default: 1)
-    analyze_and_update_sentiment(app_id)
-
-
-
+    # Get app_ids from an environment variable or define them directly
+    app_ids = os.getenv("APP_IDS", "28").split(",")  # Example: "28,29,30"
+    app_ids = [int(app_id.strip()) for app_id in app_ids]  # Convert to integers
+    main(app_ids)
