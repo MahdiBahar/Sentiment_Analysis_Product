@@ -8,9 +8,29 @@ from selenium.webdriver.support import expected_conditions as EC
 from datetime import datetime
 import time
 import os
+import base64
+import requests
+from io import BytesIO
 # to solve time out problem
 from tenacity import retry, wait_exponential, stop_after_attempt
 from selenium.common.exceptions import TimeoutException
+
+
+# Function to download an image and convert it to a base64 string
+def convert_image_to_base64(image_url):
+    try:
+        response = requests.get(image_url)
+        # Check if the request was successful
+        response.raise_for_status()  
+        # Read image data as bytes
+        img_data = BytesIO(response.content)  
+        # Encode to base64 and decode to string
+        base64_img = base64.b64encode(img_data.getvalue()).decode('utf-8')  
+        return base64_img
+    except requests.exceptions.RequestException as e:
+        print(f"Error fetching image from {image_url}: {e}")
+        return None
+
 
 
 # Database connection function
@@ -34,7 +54,6 @@ def fetch_urls_to_crawl():
     conn.close()
     return urls
 
-
 # Function to save data to PostgreSQL
 def save_to_db(data):
     conn = connect_db()
@@ -42,8 +61,8 @@ def save_to_db(data):
     insert_query = """
     INSERT INTO app_info (
         app_name, app_img, app_name_company, app_version, app_total_rate, 
-        app_average_rate, app_install, app_category, app_size, app_last_update, app_url
-    ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s,%s)
+        app_average_rate, app_install, app_category, app_size, app_last_update, app_url, app_img_base64
+    ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
     ON CONFLICT (app_name)
     DO UPDATE SET
         app_img = EXCLUDED.app_img,
@@ -55,17 +74,19 @@ def save_to_db(data):
         app_category = EXCLUDED.app_category,
         app_size = EXCLUDED.app_size,
         app_last_update = EXCLUDED.app_last_update,
-          app_url = EXCLUDED.app_url;
+        app_url = EXCLUDED.app_url,
+        app_img_base64 = EXCLUDED.app_img_base64
+        ;
 
     """
     cursor.execute(insert_query, (
         data['App_Name'], data['App_Img'], data['App_Name_Company'], data['App_Version'],
         data['App_Totoal_Rate'], data['App_Avrage_Rate'], data['App_Install'],
-        data['App_Category'], data['App_Size'], data['App_Last_Update'], data['App_URL']
+        data['App_Category'], data['App_Size'], data['App_Last_Update'], data['App_URL'],data['App_Img_Base64']
     ))
     conn.commit()
 
-  # Reset the sequence after insert to ensure sequential IDs
+    # Reset the sequence after insert to ensure sequential IDs
     reset_query = """
     SELECT setval(pg_get_serial_sequence('app_info', 'app_id'), COALESCE(MAX(app_id), 1)) FROM app_info;
     """
@@ -75,7 +96,7 @@ def save_to_db(data):
     cursor.close()
     conn.close()
 
-
+# Function to check if text contains Persian characters
 def is_persian(text):
     """Checks if the text contains Persian characters."""
     return any("\u0600" <= char <= "\u06FF" for char in text)
@@ -86,7 +107,7 @@ def load_page(driver, url):
     driver.get(url)
 
 # Function to scrape app information
-def give_information_app_first(app_name, url):
+def give_information_app(app_name, url):
     chrome_options = Options()
     chrome_options.add_argument("--headless")
     chrome_options.add_argument("--lang=fa")  
@@ -103,6 +124,9 @@ def give_information_app_first(app_name, url):
     max_retries = 5  # Set a limit to retries
 
     while retry_count < max_retries:
+        
+        
+        # driver.get(url)
 
         try:
             load_page(driver, url)
@@ -111,13 +135,12 @@ def give_information_app_first(app_name, url):
             driver.quit()
             return
 
-    # Wait for page elements to load
+
         wait = WebDriverWait(driver, 10)
         wait.until(EC.presence_of_element_located((By.CLASS_NAME, 'AppCommentsList__loadmore')))
         App_info_zone = driver.find_element(By.CLASS_NAME, 'AppDetails__col')
         App_Name = App_info_zone.find_element(By.CLASS_NAME, 'AppName').text
 
-# Check if the essential fields are in Persian
         if is_persian(App_Name):
             print("App information loaded in Persian.")
             break  # Exit the loop if the text is in Persian
@@ -132,9 +155,7 @@ def give_information_app_first(app_name, url):
     
     # Proceed with saving only if Persian content was detected
     if is_persian(App_Name):
-
         # Scrape the app details
-        
         App_Name_Company = App_info_zone.find_element(By.CLASS_NAME, 'DetailsPageHeader__company').text
         App_Version = App_info_zone.find_element(By.CLASS_NAME, 'DetailsPageHeader__subtitles').text
         App_Install = App_info_zone.find_elements(By.CLASS_NAME, 'InfoCube__content')[0].text
@@ -145,7 +166,13 @@ def give_information_app_first(app_name, url):
         App_Last_Update = App_info_zone.find_elements(By.CLASS_NAME, 'InfoCube__content')[4].text
         App_Img = App_info_zone.find_element(By.TAG_NAME, 'img').get_attribute('src')
 
-        # Format data for database insertion
+        # Convert `app_img` to base64
+        App_Img_Base64 = convert_image_to_base64(App_Img)
+
+
+
+
+        # Format data for database insertion, including the URL
         APP_INFO = {
             'App_Name': App_Name,
             'App_Img': App_Img,
@@ -157,7 +184,8 @@ def give_information_app_first(app_name, url):
             'App_Category': App_Category,
             'App_Size': App_Size,
             'App_Last_Update': App_Last_Update,
-            'App_URL': url  # Add the URL here
+            'App_URL': url , # Add the URL here
+            'App_Img_Base64': App_Img_Base64
         }
 
     driver.quit()
@@ -165,15 +193,12 @@ def give_information_app_first(app_name, url):
     # Save data to PostgreSQL
     save_to_db(APP_INFO)
 
-# Run the function
-
 # Main loop to fetch URLs from the database and scrape them
 def main():
-    # Fetch URLs from the database
     urls_to_crawl = fetch_urls_to_crawl()  
     for crawl_app_name, crawl_url in urls_to_crawl:
         print(f"Scraping {crawl_app_name} at {crawl_url}")
-        give_information_app_first(crawl_app_name, crawl_url)
+        give_information_app(crawl_app_name, crawl_url)
 
 if __name__ == "__main__":
     main()

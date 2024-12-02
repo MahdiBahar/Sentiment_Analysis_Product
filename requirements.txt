@@ -3,3 +3,4 @@ selenium
 tenacity
 tqdm
 pandas
+requests
