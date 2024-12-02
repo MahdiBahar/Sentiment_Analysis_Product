@@ -1,12 +1,20 @@
 import psycopg2
 import os
-from transformers import MT5ForConditionalGeneration, MT5Tokenizer
-import time
+from transformers import MT5ForConditionalGeneration, MT5Tokenizer,pipeline
+from googletrans import Translator
+
 
 # Load the tokenizer and model
 model_name = "persiannlp/mt5-base-parsinlu-sentiment-analysis"
 tokenizer = MT5Tokenizer.from_pretrained(model_name)
 model = MT5ForConditionalGeneration.from_pretrained(model_name)
+
+
+# Load the second model (Hugging Face pipeline)
+classifier = pipeline("sentiment-analysis")
+
+# Initialize Google Translator
+translator = Translator()
 
 # Database connection
 def connect_db():
@@ -23,7 +31,7 @@ def fetch_comments_to_analyze(app_id):
     conn = connect_db()
     cursor = conn.cursor()
     query = """
-        SELECT comment_id, comment_text 
+        SELECT comment_id, comment_text , comment_rating
         FROM comment 
         WHERE app_id = %s  
         ;
@@ -52,20 +60,41 @@ def run_model(context, text_b="نظر شما چیست", **generator_args):
     input_ids = tokenizer.encode(context + "<sep>" + text_b, return_tensors="pt")
     res = model.generate(input_ids, **generator_args)
     output = tokenizer.batch_decode(res, skip_special_tokens=True)
-    return output
+    return output[0]
+
+# Run the second model (Hugging Face pipeline)
+def run_second_model(comment_text):
+    translated_text = translator.translate(comment_text, dest="en").text
+    result = classifier(translated_text)
+    return result[0]["label"]  # Example output: "POSITIVE", "NEGATIVE", "NEUTRAL"
+
+
 
 # Main function to fetch comments for a specific app_id and update sentiments
 def analyze_and_update_sentiment(app_id):
     comments = fetch_comments_to_analyze(app_id)
-    for comment_id, comment_text in comments:
+    for comment_id, comment_text, comment_rating in comments:
         try:
-            sentiment_result = run_model(comment_text)[0]
+            sentiment_result = run_model(comment_text)
+
+            # If the first model returns "non-sentiment", run the second model
+            if sentiment_result.lower() == "no sentiment expressed":
+                second_model_result = run_second_model(comment_text)
+
+             # Apply conditional update logic based on second model result and rating
+                if second_model_result == "NEGATIVE" and comment_rating == 1 :
+                    sentiment_result = "negative"
+                elif second_model_result == "POSITIVE" and comment_rating == 5:
+                    sentiment_result = "positive"
+                # Otherwise, retain "no sentiment expressed"
+
+
+
+
             update_sentiment(comment_id, sentiment_result)
             print(f"Updated comment {comment_id} with sentiment: {sentiment_result}")
         except Exception as e:
             print(f"Error processing comment {comment_id}: {e}")
-        # Add a delay between each analysis
-        time.sleep(0.5)  # 500ms delay
 
 if __name__ == "__main__":
     app_id = int(os.getenv("APP_ID", "28"))  # Fetch app_id from environment variables (default: 1)
