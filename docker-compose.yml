@@ -49,7 +49,24 @@ services:
         condition: service_healthy # Ensures that the 'db' service starts before 'scraper'
     command: ["python", "-u","comment_scraper.py"]  # Corrected command for `comment_scraper`
     
-
+  sentiment-analyzer:
+    build:
+      context: .
+      dockerfile: Dockerfile.analyzer
+    environment:
+      # - HF_HOME=/app/.cache  # Set Hugging Face cache directory
+      DB_HOST: db                    # Hostname for PostgreSQL
+      DB_NAME: MEC_Sentiment              # Database name to connect to
+      DB_USER: postgres                  # Database username
+      DB_PASS: postgres             # Database password
+      DB_PORT: 5432                    # Database port
+      # APP_ID: 28                    # Specify the app_id to analyze (default: 1) # for V2
+      APP_IDS: 28,29,30  # List of app_ids to process # for V3
+    depends_on:
+      db:
+        condition: service_healthy   # Ensures that the 'db' service starts before 'sentiment-analyzer'
+    # volumes:
+    #   - /home/docker-data/cache:/app/.cache  # Mount persistent cache directory
 
 volumes:
   postgres_data:                       # Docker volume to persist PostgreSQL data

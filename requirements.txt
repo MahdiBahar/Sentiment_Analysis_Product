@@ -4,3 +4,4 @@ tenacity
 tqdm
 pandas
 requests
+transformers          # For Hugging Face Transformers

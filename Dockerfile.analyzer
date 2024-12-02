@@ -1,0 +1,36 @@
+
+
+FROM python:3.12.4
+
+# Set the working directory
+WORKDIR /app
+
+RUN pip install --upgrade pip
+
+
+
+# Install dependencies
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt --timeout=500
+
+
+# Install PyTorch (CPU-only version)
+RUN pip install --no-cache-dir torch torchvision torchaudio \
+    -f https://download.pytorch.org/whl/cpu/torch_stable.html
+
+
+# Download the model to cache
+RUN python -c "from transformers import MT5ForConditionalGeneration, MT5Tokenizer; \
+    MT5Tokenizer.from_pretrained('persiannlp/mt5-base-parsinlu-sentiment-analysis'); \
+    MT5ForConditionalGeneration.from_pretrained('persiannlp/mt5-base-parsinlu-sentiment-analysis')"
+
+
+# Copy the application files
+
+COPY analyze_sentiment_v1.py .
+
+# Set default app_id to 1 (can be overridden in docker-compose)
+ENV APP_IDS =1,2,3
+
+# Run the sentiment analyzer
+CMD ["python", "analyze_sentiment_v1.py"]
