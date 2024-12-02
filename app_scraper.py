@@ -8,6 +8,10 @@ from selenium.webdriver.support import expected_conditions as EC
 from datetime import datetime
 import time
 import os
+# to solve time out problem
+from tenacity import retry, wait_exponential, stop_after_attempt
+from selenium.common.exceptions import TimeoutException
+
 
 # Database connection function
 def connect_db():
@@ -76,6 +80,10 @@ def is_persian(text):
     """Checks if the text contains Persian characters."""
     return any("\u0600" <= char <= "\u06FF" for char in text)
 
+# Retry with exponential backoff for driver.get
+@retry(wait=wait_exponential(multiplier=1, min=4, max=10), stop=stop_after_attempt(3), reraise=True)
+def load_page(driver, url):
+    driver.get(url)
 
 # Function to scrape app information
 def give_information_app_first(app_name, url):
@@ -88,13 +96,21 @@ def give_information_app_first(app_name, url):
     chrome_options.add_argument("--incognito")  
 
     driver = webdriver.Chrome(options=chrome_options)
+    # Set a longer page load timeout
+    driver.set_page_load_timeout(350)
 
     retry_count = 0
     max_retries = 5  # Set a limit to retries
 
     while retry_count < max_retries:
 
-        driver.get(url)
+        try:
+            load_page(driver, url)
+        except TimeoutException:
+            print(f"Failed to load the page for app ID {app_name} after retries.")
+            driver.quit()
+            return
+
     # Wait for page elements to load
         wait = WebDriverWait(driver, 10)
         wait.until(EC.presence_of_element_located((By.CLASS_NAME, 'AppCommentsList__loadmore')))

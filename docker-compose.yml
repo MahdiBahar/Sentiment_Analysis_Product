@@ -35,6 +35,21 @@ services:
         condition: service_healthy # Ensures that the 'db' service starts before 'scraper'
     command: ["python", "-u", "app_scraper.py"]  # Script to run for `app_scraper`
 
+  comment_scraper:
+    build: .
+    shm_size: '1gb'  # Increase shared memory size
+    environment:
+      DB_HOST: db                    # Hostname for PostgreSQL (the `db` service name within Docker Compose)
+      DB_NAME: MEC_Sentiment              # Database name to connect to
+      DB_USER: postgres                  # Database username
+      DB_PASS: postgres             # Database password
+      DB_PORT: 5432                    # Database port
+    depends_on:
+      db:
+        condition: service_healthy # Ensures that the 'db' service starts before 'scraper'
+    command: ["python", "-u","comment_scraper.py"]  # Corrected command for `comment_scraper`
+    
+
 
 volumes:
   postgres_data:                       # Docker volume to persist PostgreSQL data
