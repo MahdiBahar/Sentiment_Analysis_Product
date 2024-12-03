@@ -1,3 +1,4 @@
+# Complete count new comments, number of all comments, the date of crawling part
 # Import libraries
 import psycopg2
 from selenium import webdriver
@@ -12,13 +13,14 @@ from tqdm import tqdm
 from datetime import datetime
 import os
 import random
-# to solve time out problem
+# to solve timeout problem
 from tenacity import retry, wait_exponential, stop_after_attempt
 from selenium.common.exceptions import TimeoutException
 
 
 # Database connection function
 def connect_db():
+    """Connect to the PostgreSQL database."""
     conn = psycopg2.connect(
         host=os.getenv("DB_HOST", "localhost"),
         database=os.getenv("DB_NAME", "MEC-Sentiment"),
@@ -29,8 +31,44 @@ def connect_db():
     return conn
 
 
+def save_details_to_app_info(app_id, count_scraped_comments, count_new_comments, comment_scraped_time):
+    """
+    Update or insert app information into the app_info table.
+    """
+    conn = connect_db()
+    cursor = conn.cursor()
+
+    # Check if the app_id exists
+    check_query = "SELECT COUNT(*) FROM public.app_info WHERE app_id = %s;"
+    cursor.execute(check_query, (app_id,))
+    exists = cursor.fetchone()[0] > 0
+
+    if exists:
+        # Update the record if app_id exists
+        update_query = """
+        UPDATE public.app_info
+        SET count_scraped_comments = %s,
+            count_new_comments = %s,
+            last_update_comment_scraping = %s
+        WHERE app_id = %s;
+        """
+        cursor.execute(update_query, (count_scraped_comments, count_new_comments, comment_scraped_time, app_id))
+    else:
+        # Insert a new record if app_id does not exist
+        insert_query = """
+        INSERT INTO public.app_info (app_id, count_scraped_comments, count_new_comments, last_update_comment_scraping)
+        VALUES (%s, %s, %s, %s);
+        """
+        cursor.execute(insert_query, (app_id, count_scraped_comments, count_new_comments, comment_scraped_time))
+
+    conn.commit()
+    cursor.close()
+    conn.close()
+
+
 # Fetch app_ids and app_urls from the app_info table
 def fetch_app_urls_to_crawl():
+    """Fetch app IDs and URLs to crawl from the app_info table."""
     conn = connect_db()
     cursor = conn.cursor()
     cursor.execute("SELECT app_id, app_url FROM public.app_info")
@@ -40,20 +78,27 @@ def fetch_app_urls_to_crawl():
     return apps
 
 
- #Function to save comments in batches with uniqueness enforced on `comment_idd`
+# Function to save comments in batches with uniqueness enforced on `comment_idd`
 def save_comments_to_db(comments):
+    """
+    Save comments in the database, ensuring uniqueness on `comment_idd`.
+    Returns the count of new comments inserted.
+    """
     if not comments:
-        return
+        return 0  # Return 0 if no comments to insert
+
     conn = connect_db()
     cursor = conn.cursor()
     insert_query = """
-    INSERT INTO public.comment (app_id, user_name, comment_text, comment_rating, comment_date, sentiment_processed, iid, comment_idd)
-    VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+    INSERT INTO public.comment (app_id, user_name, comment_text, comment_rating, comment_date, second_model_processed, comment_idd)
+    VALUES (%s, %s, %s, %s, %s, %s, %s)
     ON CONFLICT (comment_idd) DO NOTHING;
     """
     cursor.executemany(insert_query, comments)
+    new_comments_count = cursor.rowcount  # Count the number of new rows inserted
     conn.commit()
-        # Reset the sequence after insert to ensure sequential IDs
+
+    # Reset the sequence after insert to ensure sequential IDs
     reset_query = """
     SELECT setval(pg_get_serial_sequence('public.comment', 'comment_id'), COALESCE(MAX(comment_id), 1)) FROM public.comment;
     """
@@ -62,14 +107,20 @@ def save_comments_to_db(comments):
     
     cursor.close()
     conn.close()
+    return new_comments_count  # Return the count of new comments
 
 
 # Retry with exponential backoff for driver.get
 @retry(wait=wait_exponential(multiplier=1, min=4, max=10), stop=stop_after_attempt(3), reraise=True)
 def load_page(driver, url):
+    """Load a page with retries."""
     driver.get(url)
 
+
 def crawl_comments(app_id, app_url):
+    """
+    Crawl comments for a specific app.
+    """
     chrome_options = Options()
     chrome_options.add_argument("--headless")
     chrome_options.add_argument("--lang=fa")
@@ -98,35 +149,34 @@ def crawl_comments(app_id, app_url):
     # Scroll down to load initial comments
     total_clicks = 0
     while True:
-        # Restart logic without reloading the URL
         click_count = 0
         while click_count < 126:
             try:
-                # Random delay to avoid detection
                 time.sleep(random.uniform(2, 5))
                 load_more_button = wait.until(EC.element_to_be_clickable((By.CLASS_NAME, 'AppCommentsList__loadmore')))
                 driver.execute_script("arguments[0].click();", load_more_button)
                 click_count += 1
                 total_clicks += 1
                 print(f"Clicked 'Load more' {total_clicks} times.")
-                time.sleep(10)  # Allow time for comments to load
+                time.sleep(10)
             except Exception:
                 print("No more 'Load more' button found, or end of comments reached.")
                 break
-        
-        # Clear cookies to simulate a new session, but continue from current scroll
-        print("Simulating session refresh...")
-        driver.delete_all_cookies()  # Clear cookies to "refresh" the session
-        driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")  # Scroll to where we left off
 
-        # Re-attempt "Load more" after session reset
-        if click_count < 126:  # If click_count is less than the click numbers in this cycle, we assume we're done
+        print("Simulating session refresh...")
+        driver.delete_all_cookies()
+        driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
+
+        if click_count < 126:
             break
 
     # Extract comments after all clicks are complete
     print(f"Scraping comments for app ID {app_id}...")
     comments_elements = driver.find_elements(By.CLASS_NAME, 'AppComment')
     print(f"Found {len(comments_elements)} comments for app ID {app_id}.")
+
+    count_scraped_comments = len(comments_elements)
+    comment_scraped_time = datetime.now()
 
     comments_data = []
     for comment in tqdm(comments_elements):
@@ -136,37 +186,28 @@ def crawl_comments(app_id, app_url):
             date = comment.find_element(By.CLASS_NAME, 'AppComment__meta').text
 
             try:
-                # Get the `id` attribute and directly convert it to an integer
                 comment_idd = int(comment.get_attribute('id'))
-               
             except ValueError as e:
                 print(f"Failed to convert comment ID to integer: {e}")
-            except Exception as e:
-                print(f"Error extracting comment ID: {e}")
+                continue
 
-            # Extract rating if available
             try:
                 rating = int(comment.find_element(By.CLASS_NAME, 'rating__fill').get_attribute('style').split()[1].split('%')[0]) / 20
             except:
                 rating = None
 
-            # Generate unique `iid`
-            iid = hashlib.sha256((username + comment_text + date).encode('utf-8')).hexdigest()
-
-            # Convert date to standard format
             try:
                 converted_date = datetime.strptime(date, "%Y/%m/%d").strftime("%Y-%m-%d")
             except ValueError:
                 converted_date = datetime.now().strftime("%Y-%m-%d")
 
-            # Append data to batch list
-            comments_data.append((app_id, username, comment_text, rating, converted_date,  False, iid, comment_idd))
-
+            comments_data.append((app_id, username, comment_text, rating, converted_date, False, comment_idd))
         except Exception as e:
             print(f"Error processing a comment for app ID {app_id}: {e}")
 
-    # Save comments in batch
-    save_comments_to_db(comments_data)
+    new_comments_count = save_comments_to_db(comments_data)
+    save_details_to_app_info(app_id, count_scraped_comments, new_comments_count, comment_scraped_time)
+
     driver.quit()
 
 
@@ -175,8 +216,9 @@ def main():
     apps = fetch_app_urls_to_crawl()
     for app_id, app_url in apps:
         print(f"Crawling comments for app at {app_url}")
-        if (app_id == 28):  # Start from a specific app ID if needed
+        if (app_id==29):
             crawl_comments(app_id, app_url)
+
 
 if __name__ == "__main__":
     main()
