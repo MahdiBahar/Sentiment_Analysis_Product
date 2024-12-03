@@ -7,7 +7,8 @@ WORKDIR /app
 
 RUN pip install --upgrade pip
 
-
+# # Set a custom Hugging Face cache directory
+# ENV HF_HOME=/app/.cache
 
 # Install dependencies
 COPY requirements.txt .
