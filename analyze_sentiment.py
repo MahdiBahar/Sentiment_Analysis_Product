@@ -1,12 +1,24 @@
+#import
 import psycopg2
 import os
-from transformers import MT5ForConditionalGeneration, MT5Tokenizer
+from transformers import MT5ForConditionalGeneration, MT5Tokenizer, pipeline
 import time
+from googletrans import Translator
+
 
 # Load the tokenizer and model
 model_name = "persiannlp/mt5-base-parsinlu-sentiment-analysis"
 tokenizer = MT5Tokenizer.from_pretrained(model_name)
 model = MT5ForConditionalGeneration.from_pretrained(model_name)
+
+
+# Load the second model (Hugging Face pipeline)
+classifier = pipeline("sentiment-analysis")
+
+# Initialize Google Translator
+translator = Translator()
+
+
 
 # Sentiment mapping for scoring
 SENTIMENT_SCORES = {
@@ -18,6 +30,9 @@ SENTIMENT_SCORES = {
     "very positive": 2,
     "no sentiment expressed": 10
 }
+
+
+
 
 # Database connection
 def connect_db():
@@ -34,12 +49,12 @@ def fetch_comments_to_analyze(app_id):
     conn = connect_db()
     cursor = conn.cursor()
     query = """
-        SELECT comment_id, comment_text 
+        SELECT comment_id, comment_text , comment_rating
         FROM comment 
-        WHERE app_id = %s 
+        WHERE app_id = %s  AND sentiment_score IS NULL
         ;
     """
-    ######AND sentiment_result IS NULL
+  
     #########LIMIT 100
     cursor.execute(query, (app_id,))
     comments = cursor.fetchall()
@@ -48,15 +63,15 @@ def fetch_comments_to_analyze(app_id):
     return comments
 
 # Update the comment table with the sentiment result and sentiment score
-def update_sentiment(comment_id, sentiment_result, sentiment_score):
+def update_sentiment(comment_id, sentiment_result, sentiment_score, sentiment_processed):
     conn = connect_db()
     cursor = conn.cursor()
     query = """
         UPDATE comment 
-        SET sentiment_result = %s, sentiment_score = %s 
+        SET sentiment_result = %s, sentiment_score = %s , sentiment_processed=%s 
         WHERE comment_id = %s;
     """
-    cursor.execute(query, (sentiment_result, sentiment_score, comment_id))
+    cursor.execute(query, (sentiment_result, sentiment_score, sentiment_processed, comment_id))
     conn.commit()
     cursor.close()
     conn.close()
@@ -67,6 +82,16 @@ def run_model(context, text_b="نظر شما چیست", **generator_args):
     res = model.generate(input_ids, **generator_args)
     output = tokenizer.batch_decode(res, skip_special_tokens=True)
     return output[0]
+
+# Run the second model (Hugging Face pipeline)
+def run_second_model(comment_text):
+    translated_text = translator.translate(comment_text, dest="en").text
+    result = classifier(translated_text)
+    return result[0]["label"]  # Example output: "POSITIVE", "NEGATIVE", "NEUTRAL"
+
+
+
+
 
 # Validate sentiment result and assign score
 def validate_and_score_sentiment(sentiment_result):
@@ -85,13 +110,29 @@ def analyze_and_update_sentiment(app_ids):
         comments = fetch_comments_to_analyze(app_id)
         if not comments:
             print("No more comments to analyze.")
-            return
+            continue
 
-        for comment_id, comment_text in comments:
+        for comment_id, comment_text, comment_rating in comments:
             try:
                 sentiment_result = run_model(comment_text)
+                sentiment_processed=False
+                # If the first model returns "non-sentiment", run the second model
+                if sentiment_result.lower() == "no sentiment expressed":
+                    second_model_result = run_second_model(comment_text)
+
+                # Apply conditional update logic based on second model result and rating
+                    if second_model_result == "NEGATIVE" and comment_rating == 1 :
+                        sentiment_result = "negative"
+                        sentiment_processed= True
+                        print("second_model is used")
+                    elif second_model_result == "POSITIVE" and comment_rating == 5:
+                        sentiment_result = "positive"
+                        sentiment_processed= True
+                        print("second_model is used")
+                    # Otherwise, retain "no sentiment expressed"
+
                 sentiment_result, sentiment_score = validate_and_score_sentiment(sentiment_result)                
-                update_sentiment(comment_id, sentiment_result, sentiment_score)
+                update_sentiment(comment_id, sentiment_result, sentiment_score,sentiment_processed)
                 print(f"Updated comment {comment_id} for id {app_id} with sentiment: {sentiment_result}, score: {sentiment_score}")
             except Exception as e:
                 print(f"Error processing comment {comment_id}: {e}")
@@ -101,7 +142,8 @@ def analyze_and_update_sentiment(app_ids):
 
 if __name__ == "__main__":
     try:
-        app_ids = list(map(int,os.getenv("APP_IDS","28").split(",")))
+        app_ids = list(map(int,os.getenv("APP_IDS","4").split(",")))
+        print(f'app_ids = {app_ids}')
         # app_id = int(os.getenv("APP_ID", "28"))  # Fetch app_id from environment variables (default: 28)
         analyze_and_update_sentiment(app_ids)
     except KeyboardInterrupt:
