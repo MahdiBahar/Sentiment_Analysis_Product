@@ -21,6 +21,8 @@ ENV DB_PORT=5432
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
+
+RUN apt-get update && apt-get install -y chromium chromium-driver
 # Copy the application code
 COPY . .
 

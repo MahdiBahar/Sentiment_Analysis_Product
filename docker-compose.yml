@@ -13,7 +13,7 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data  # Persist data in a Docker volume named 'postgres_data'
       # We want to block the execuation of init_table_sentiment.sql. So, I comment the code
-      - ./init_table_sentiment.sql:/docker-entrypoint-initdb.d/init_table_sentiment.sql  # Initialize with SQL script
+      # - ./init_table_sentiment.sql:/docker-entrypoint-initdb.d/init_table_sentiment.sql  # Initialize with SQL script
     #Wait for postgresql to response
     healthcheck: 
       test: ["CMD-SHELL", "pg_isready -U postgres -d MEC_Sentiment"]

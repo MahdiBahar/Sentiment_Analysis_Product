@@ -1,10 +1,9 @@
 import psycopg2
 import os
-import shutil  # For clearing cache
 from transformers import MT5ForConditionalGeneration, MT5Tokenizer, pipeline
 from googletrans import Translator
 
-# Load the first model (MT5)
+# Load the tokenizer and model
 model_name = "persiannlp/mt5-base-parsinlu-sentiment-analysis"
 tokenizer = MT5Tokenizer.from_pretrained(model_name)
 model = MT5ForConditionalGeneration.from_pretrained(model_name)
@@ -25,18 +24,20 @@ def connect_db():
         port=os.getenv("DB_PORT", "5432")
     )
 
-# Fetch a batch of comments for analysis
-def fetch_comments_to_analyze(app_id, batch_size=50):
+# Fetch comments that need sentiment analysis for a specific app
+def fetch_comments_to_analyze(app_id):
     conn = connect_db()
     cursor = conn.cursor()
     query = """
         SELECT comment_id, comment_text, comment_rating
-        FROM comment
-        WHERE app_id = %s AND sentiment_result IS NULL
-        ORDER BY comment_id ASC
-        LIMIT %s;
+        FROM comment 
+        WHERE app_id = %s  
+        ;
     """
-    cursor.execute(query, (app_id, batch_size))
+    ##########AND sentiment_result IS NULL
+    ####### LIMIT 100
+
+    cursor.execute(query, (app_id,))
     comments = cursor.fetchall()
     cursor.close()
     conn.close()
@@ -52,8 +53,8 @@ def update_sentiment(comment_id, sentiment_result):
     cursor.close()
     conn.close()
 
-# Run the first model (MT5)
-def run_first_model(context, text_b="نظر شما چیست", **generator_args):
+# Run the sentiment analysis model
+def run_model(context, text_b="نظر شما چیست", **generator_args):
     input_ids = tokenizer.encode(context + "<sep>" + text_b, return_tensors="pt")
     res = model.generate(input_ids, **generator_args)
     output = tokenizer.batch_decode(res, skip_special_tokens=True)
@@ -65,45 +66,37 @@ def run_second_model(comment_text):
     result = classifier(translated_text)
     return result[0]["label"]  # Example output: "POSITIVE", "NEGATIVE", "NEUTRAL"
 
-# Clear Hugging Face cache
-def clear_cache():
-    cache_dir = os.getenv("HF_HOME", "/root/.cache/huggingface")
-    if os.path.exists(cache_dir):
-        shutil.rmtree(cache_dir)
-        print("Cache cleared.")
+# Analyze and update sentiment for each comment
+def analyze_and_update_sentiment(app_id):
+    comments = fetch_comments_to_analyze(app_id)
+    for comment_id, comment_text, comment_rating in comments:
+        try:
+            sentiment_result = run_model(comment_text)
 
-# Analyze and update sentiment for each batch
-def analyze_and_update_sentiment(app_id, batch_size=50):
-    while True:
-        comments = fetch_comments_to_analyze(app_id, batch_size)
-        if not comments:  # No more comments to process
-            print(f"All comments for app_id {app_id} have been processed.")
-            break
+            # If the first model returns "no sentiment expressed", run the second model
+            if sentiment_result.lower() == "no sentiment expressed":
+                second_model_result = run_second_model(comment_text)
 
-        for comment_id, comment_text, comment_rating in comments:
-            try:
-                sentiment_result = run_first_model(comment_text)
+                # Apply conditional update logic based on second model result and rating
+                if second_model_result == "NEGATIVE" and comment_rating == 1:
+                    sentiment_result = "negative"
+                elif second_model_result == "POSITIVE" and comment_rating == 5:
+                    sentiment_result = "positive"
+                # Otherwise, retain "no sentiment expressed"
 
-                # If the first model returns "no sentiment expressed", run the second model
-                if sentiment_result.lower() == "no sentiment expressed":
-                    second_model_result = run_second_model(comment_text)
+            update_sentiment(comment_id, sentiment_result)
+            print(f"Updated comment {comment_id} with sentiment: {sentiment_result}")
+        except Exception as e:
+            print(f"Error processing comment {comment_id}: {e}")
 
-                    # Apply conditional update logic based on second model result and rating
-                    if second_model_result == "NEGATIVE" and comment_rating == 1:
-                        sentiment_result = "negative"
-                    elif second_model_result == "POSITIVE" and comment_rating == 5:
-                        sentiment_result = "positive"
-                    # Otherwise, retain "no sentiment expressed"
-
-                update_sentiment(comment_id, sentiment_result)
-                print(f"Updated comment {comment_id} with sentiment: {sentiment_result}")
-            except Exception as e:
-                print(f"Error processing comment {comment_id}: {e}")
-
-        # Clear cache after processing each batch
-        clear_cache()
+# Main function to process multiple app_ids
+def main(app_ids):
+    for app_id in app_ids:
+        print(f"Processing app_id: {app_id}")
+        analyze_and_update_sentiment(app_id)
 
 if __name__ == "__main__":
-    app_id = int(os.getenv("APP_ID", "28"))  # Fetch app_id from environment variables (default: 28)
-    batch_size = int(os.getenv("BATCH_SIZE", "50"))  # Fetch batch size from environment variables (default: 50)
-    analyze_and_update_sentiment(app_id, batch_size)
+    # Get app_ids from an environment variable or define them directly
+    app_ids = os.getenv("APP_IDS", "28").split(",")  # Example: "28,29,30"
+    app_ids = [int(app_id.strip()) for app_id in app_ids]  # Convert to integers
+    main(app_ids)
