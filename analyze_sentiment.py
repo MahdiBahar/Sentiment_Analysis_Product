@@ -1,4 +1,4 @@
-#import
+# Import libraries
 import psycopg2
 import os
 from transformers import MT5ForConditionalGeneration, MT5Tokenizer, pipeline
@@ -11,14 +11,11 @@ model_name = "persiannlp/mt5-base-parsinlu-sentiment-analysis"
 tokenizer = MT5Tokenizer.from_pretrained(model_name)
 model = MT5ForConditionalGeneration.from_pretrained(model_name)
 
-
 # Load the second model (Hugging Face pipeline)
 classifier = pipeline("sentiment-analysis")
 
 # Initialize Google Translator
 translator = Translator()
-
-
 
 # Sentiment mapping for scoring
 SENTIMENT_SCORES = {
@@ -30,9 +27,6 @@ SENTIMENT_SCORES = {
     "very positive": 2,
     "no sentiment expressed": 10
 }
-
-
-
 
 # Database connection
 def connect_db():
@@ -54,8 +48,7 @@ def fetch_comments_to_analyze(app_id):
         WHERE app_id = %s  AND sentiment_score IS NULL
         ;
     """
-  
-    #########LIMIT 100
+
     cursor.execute(query, (app_id,))
     comments = cursor.fetchall()
     cursor.close()
@@ -76,21 +69,36 @@ def update_sentiment(comment_id, sentiment_result, sentiment_score, sentiment_pr
     cursor.close()
     conn.close()
 
-# Run the sentiment analysis model
+
 def run_model(context, text_b="نظر شما چیست", **generator_args):
-    input_ids = tokenizer.encode(context + "<sep>" + text_b, return_tensors="pt")
-    res = model.generate(input_ids, **generator_args)
-    output = tokenizer.batch_decode(res, skip_special_tokens=True)
-    return output[0]
+    try:
+        input_ids = tokenizer.encode(context + "<sep>" + text_b, return_tensors="pt")
+        res = model.generate(input_ids, **generator_args)
+        output = tokenizer.batch_decode(res, skip_special_tokens=True)
 
-# Run the second model (Hugging Face pipeline)
+        if not output:  # Check if the output is empty
+            raise ValueError("Model returned empty output.")
+        return output[0]
+    except Exception as e:
+        print(f"Error in run_model: {e}")
+        return "no sentiment expressed"  # Fallback value
+
+
+
 def run_second_model(comment_text):
-    translated_text = translator.translate(comment_text, dest="en").text
-    result = classifier(translated_text)
-    return result[0]["label"]  # Example output: "POSITIVE", "NEGATIVE", "NEUTRAL"
-
-
-
+    try:
+        translated_text = translator.translate(comment_text, dest="en").text
+        if not translated_text:  # Check if translation failed
+            raise ValueError("Translation returned empty text.")
+        
+        result = classifier(translated_text)
+        if not result or not isinstance(result, list):  # Validate classifier output
+            raise ValueError("Classifier returned invalid result.")
+        
+        return result[0]["label"]  # Example output: "POSITIVE", "NEGATIVE", "NEUTRAL"
+    except Exception as e:
+        print(f"Error in run_second_model: {e}")
+        return "no sentiment expressed"  # Fallback value
 
 
 # Validate sentiment result and assign score
@@ -117,7 +125,9 @@ def analyze_and_update_sentiment(app_ids):
                 sentiment_result = run_model(comment_text)
                 sentiment_processed=False
                 # If the first model returns "non-sentiment", run the second model
-                if sentiment_result.lower() == "no sentiment expressed":
+                if (sentiment_result.lower() == "no sentiment expressed" or sentiment_result.lower() == "mixed" ):
+                    
+                    print(f"The current sentiment for this comment is {sentiment_result.lower()}")
                     second_model_result = run_second_model(comment_text)
 
                 # Apply conditional update logic based on second model result and rating
@@ -136,7 +146,8 @@ def analyze_and_update_sentiment(app_ids):
                 print(f"Updated comment {comment_id} for id {app_id} with sentiment: {sentiment_result}, score: {sentiment_score}")
             except Exception as e:
                 print(f"Error processing comment {comment_id}: {e}")
-
+                update_sentiment(comment_id, "no sentiment expressed", 10, False)  # Assign fallback values
+                continue
             # Add a delay between each analysis
             time.sleep(0.3)  # 300ms delay
 
