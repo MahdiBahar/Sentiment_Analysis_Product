@@ -1,21 +1,77 @@
+# string format for jalali data
+from datetime import datetime, date
 from persiantools.jdatetime import JalaliDate
+import psycopg2
+import os
 
-from datetime import datetime
+# Database connection
+def connect_db():
+    return psycopg2.connect(
+        host=os.getenv("DB_HOST", "localhost"),
+        database=os.getenv("DB_NAME", "MEC-Sentiment"),
+        user=os.getenv("DB_USER", "postgres"),
+        password=os.getenv("DB_PASS", "postgres"),
+        port=os.getenv("DB_PORT", "5432")
+    )
 
+# Function to update Jalali dates for comments
+def update_jalali_dates(app_id=None):
+    conn = connect_db()
+    cursor = conn.cursor()
 
-def convert_to_jalali(gregorian_date):
+    # SQL to fetch comments with missing Jalali dates
+    query = """
+        SELECT comment_id, comment_date 
+        FROM public.comment
+        WHERE (comment_date_jalali IS NULL OR comment_date_jalali = '')
+    """
+    params = []
+    if app_id:
+        query += " AND app_id = %s"
+        params.append(app_id)
+    
+    cursor.execute(query, params)
+    rows = cursor.fetchall()
 
-    try:
-        if isinstance(gregorian_date, str):
-            gregorian_date = datetime.strptime(gregorian_date, "%Y-%m-%d").date()
-        jalali_date = JalaliDate(gregorian_date)
-        return int(jalali_date.strftime("%Y%m%d"))
-    except Exception as e:
-        print(f"Error converting date {gregorian_date}: {e}")
-        return None
+    if not rows:
+        print("No rows to update.")
+        cursor.close()
+        conn.close()
+        return
 
+    updates = []
+    for comment_id, comment_date in rows:
+        try:
+            # Ensure `comment_date` is converted to `datetime.date` if necessary
+            if isinstance(comment_date, str):
+                comment_date = datetime.strptime(comment_date, "%Y-%m-%d").date()
+            
+            # Convert to Jalali
+            jalali_date = JalaliDate(comment_date)
+            jalali_date_str = jalali_date.strftime("%Y-%m-%d")  # Save as string
+            updates.append((jalali_date_str, comment_id))
+        except ValueError as e:
+            print(f"Skipping invalid date {comment_date}: {e}")
+        except Exception as e:
+            print(f"Error converting date {comment_date}: {e}")
 
+    if updates:
+        try:
+            cursor.executemany(
+                "UPDATE public.comment SET comment_date_jalali = %s WHERE comment_id = %s;",
+                updates,
+            )
+            conn.commit()
+            print(f"Successfully updated {len(updates)} rows.")
+        except Exception as e:
+            print(f"Error updating Jalali dates: {e}")
+    else:
+        print("No valid dates to update.")
 
-time_now = datetime.now().strftime("%Y-%m-%d")
-converted_time = convert_to_jalali(time_now)
-print(converted_time)
+    cursor.close()
+    conn.close()
+
+if __name__ == "__main__":
+    app_id = input("Enter app_id to test (or press Enter to process all): ").strip()
+    app_id = int(app_id) if app_id else None
+    update_jalali_dates(app_id)
