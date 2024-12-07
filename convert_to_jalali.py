@@ -1,4 +1,4 @@
-# string format for jalali data
+# Import packages
 from datetime import datetime, date
 from persiantools.jdatetime import JalaliDate
 import psycopg2
@@ -23,7 +23,7 @@ def update_jalali_dates(app_id=None):
     query = """
         SELECT comment_id, comment_date 
         FROM public.comment
-        WHERE (comment_date_jalali IS NULL OR comment_date_jalali = '')
+        WHERE (comment_date_jalali IS NULL OR comment_date_jalali = 0)
     """
     params = []
     if app_id:
@@ -46,10 +46,10 @@ def update_jalali_dates(app_id=None):
             if isinstance(comment_date, str):
                 comment_date = datetime.strptime(comment_date, "%Y-%m-%d").date()
             
-            # Convert to Jalali
+            # Convert to Jalali and format as integer
             jalali_date = JalaliDate(comment_date)
-            jalali_date_str = jalali_date.strftime("%Y-%m-%d")  # Save as string
-            updates.append((jalali_date_str, comment_id))
+            jalali_date_int = int(jalali_date.strftime("%Y%m%d"))  # Convert to integer in YYYYMMDD format
+            updates.append((jalali_date_int, comment_id))
         except ValueError as e:
             print(f"Skipping invalid date {comment_date}: {e}")
         except Exception as e:

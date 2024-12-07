@@ -1,4 +1,3 @@
-# Complete count new comments, number of all comments, the date of crawling part
 # Import libraries
 import psycopg2
 from selenium import webdriver
@@ -8,7 +7,7 @@ from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.chrome.service import Service
 import time
-import hashlib
+from persiantools.jdatetime import JalaliDate
 from tqdm import tqdm
 from datetime import datetime
 import os
@@ -29,6 +28,19 @@ def connect_db():
         port=os.getenv("DB_PORT", "5432")
     )
     return conn
+
+
+def convert_to_jalali(gregorian_date):
+    """Convert a Gregorian date to Jalali date in YYYYMMDD integer format."""
+    try:
+        if isinstance(gregorian_date, str):
+            gregorian_date = datetime.strptime(gregorian_date, "%Y-%m-%d").date()
+        jalali_date = JalaliDate(gregorian_date)
+        return int(jalali_date.strftime("%Y%m%d"))
+    except Exception as e:
+        print(f"Error converting date {gregorian_date}: {e}")
+        return None
+
 
 
 def save_details_to_app_info(app_id, count_scraped_comments, count_new_comments, comment_scraped_time):
@@ -90,8 +102,8 @@ def save_comments_to_db(comments):
     conn = connect_db()
     cursor = conn.cursor()
     insert_query = """
-    INSERT INTO public.comment (app_id, user_name, comment_text, comment_rating, comment_date, second_model_processed, comment_idd)
-    VALUES (%s, %s, %s, %s, %s, %s, %s)
+    INSERT INTO public.comment (app_id, user_name, comment_text, comment_rating, comment_date, second_model_processed, comment_idd, comment_date_jalali)
+    VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
     ON CONFLICT (comment_idd) DO NOTHING;
     """
     cursor.executemany(insert_query, comments)
@@ -176,7 +188,9 @@ def crawl_comments(app_id, app_url):
     print(f"Found {len(comments_elements)} comments for app ID {app_id}.")
 
     count_scraped_comments = len(comments_elements)
-    comment_scraped_time = datetime.now()
+    scraped_time_now = datetime.now().strftime("%Y-%m-%d")
+    comment_scraped_time = convert_to_jalali(scraped_time_now)
+
 
     comments_data = []
     for comment in tqdm(comments_elements):
@@ -198,10 +212,12 @@ def crawl_comments(app_id, app_url):
 
             try:
                 converted_date = datetime.strptime(date, "%Y/%m/%d").strftime("%Y-%m-%d")
+                comment_date_jalali = convert_to_jalali(converted_date)
             except ValueError:
                 converted_date = datetime.now().strftime("%Y-%m-%d")
+                comment_date_jalali = convert_to_jalali(converted_date)
 
-            comments_data.append((app_id, username, comment_text, rating, converted_date, False, comment_idd))
+            comments_data.append((app_id, username, comment_text, rating, converted_date, False, comment_idd,comment_date_jalali))
         except Exception as e:
             print(f"Error processing a comment for app ID {app_id}: {e}")
 
@@ -210,13 +226,12 @@ def crawl_comments(app_id, app_url):
 
     driver.quit()
 
-
 # Main function for crawling comments
 def main():
     apps = fetch_app_urls_to_crawl()
     for app_id, app_url in apps:
         print(f"Crawling comments for app at {app_url}")
-        if (app_id==29):
+        if (app_id==28):
             crawl_comments(app_id, app_url)
 
 
