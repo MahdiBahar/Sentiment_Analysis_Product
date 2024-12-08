@@ -248,26 +248,3 @@ def give_information_app(app_name, url):
     }
 
     return APP_INFO
-
-# Main loop to fetch URLs from the database and scrape them
-def main():
-    urls_to_crawl = fetch_urls_to_crawl() 
-
-    app_time_now = datetime.now() # Capture the current time when the scraping session starts
-    app_scraped_time = datetime.now() # Capture the current time when the scraping session starts
-    app_scraped_time_jalali = convert_to_jalali(app_time_now)
- 
-    for crawl_app_name, crawl_url in urls_to_crawl:
-        print(f"Scraping {crawl_app_name} at {crawl_url}")
-        app_data = give_information_app(crawl_app_name, crawl_url)
-
-        if app_data:
-            # Update app_info and retrieve the app_id
-            app_id = get_or_create_app_id(app_data)
-
-            # Log the scrape with the explicit scraped_time
-            log_scrape(app_data, app_id, app_scraped_time, app_scraped_time_jalali)
-
-
-if __name__ == "__main__":
-    main()
