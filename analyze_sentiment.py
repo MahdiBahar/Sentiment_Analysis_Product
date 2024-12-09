@@ -4,7 +4,10 @@ import os
 from transformers import MT5ForConditionalGeneration, MT5Tokenizer, pipeline
 import time
 from googletrans import Translator
+from dotenv import load_dotenv
 
+# Load environment variables from .env file
+load_dotenv()
 
 # Load the tokenizer and model
 model_name = "persiannlp/mt5-base-parsinlu-sentiment-analysis"
@@ -30,13 +33,15 @@ SENTIMENT_SCORES = {
 
 # Database connection
 def connect_db():
-    return psycopg2.connect(
-        host=os.getenv("DB_HOST", "localhost"),
-        database=os.getenv("DB_NAME", "MEC-Sentiment"),
-        user=os.getenv("DB_USER", "postgres"),
-        password=os.getenv("DB_PASS", "postgres"),
-        port=os.getenv("DB_PORT", "5432")
+    conn = psycopg2.connect(
+        host=os.getenv("DB_HOST"),
+        database=os.getenv("DB_NAME"),
+        user=os.getenv("DB_USER"),
+        password=os.getenv("DB_PASS"),
+        port=os.getenv("DB_PORT")
     )
+    return conn
+
 
 # Fetch comments that need sentiment analysis for a specific app
 def fetch_comments_to_analyze(app_id):

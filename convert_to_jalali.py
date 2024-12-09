@@ -3,16 +3,22 @@ from datetime import datetime, date
 from persiantools.jdatetime import JalaliDate
 import psycopg2
 import os
+from dotenv import load_dotenv
+# Load environment variables from .env file
+load_dotenv()
 
-# Database connection
+
+# Database connection function
 def connect_db():
-    return psycopg2.connect(
-        host=os.getenv("DB_HOST", "localhost"),
-        database=os.getenv("DB_NAME", "MEC-Sentiment"),
-        user=os.getenv("DB_USER", "postgres"),
-        password=os.getenv("DB_PASS", "postgres"),
-        port=os.getenv("DB_PORT", "5432")
+    conn = psycopg2.connect(
+        host=os.getenv("DB_HOST"),
+        database=os.getenv("DB_NAME"),
+        user=os.getenv("DB_USER"),
+        password=os.getenv("DB_PASS"),
+        port=os.getenv("DB_PORT")
     )
+    return conn
+
 
 # Function to update Jalali dates for comments
 def update_jalali_dates(app_id=None):

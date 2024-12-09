@@ -7,3 +7,4 @@ requests
 transformers          # For Hugging Face Transformers
 # # for using second model
 googletrans==4.0.0-rc1  # Google Translator API 
+dotenv

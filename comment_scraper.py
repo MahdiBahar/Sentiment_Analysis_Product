@@ -15,17 +15,20 @@ import random
 # to solve timeout problem
 from tenacity import retry, wait_exponential, stop_after_attempt
 from selenium.common.exceptions import TimeoutException
+from dotenv import load_dotenv
 
+# Load environment variables from .env file
+load_dotenv()
 
 # Database connection function
 def connect_db():
     """Connect to the PostgreSQL database."""
     conn = psycopg2.connect(
-        host=os.getenv("DB_HOST", "localhost"),
-        database=os.getenv("DB_NAME", "MEC-Sentiment"),
-        user=os.getenv("DB_USER", "postgres"),
-        password=os.getenv("DB_PASS", "postgres"),
-        port=os.getenv("DB_PORT", "5432")
+        host=os.getenv("DB_HOST"),
+        database=os.getenv("DB_NAME"),
+        user=os.getenv("DB_USER"),
+        password=os.getenv("DB_PASS"),
+        port=os.getenv("DB_PORT")
     )
     return conn
 
