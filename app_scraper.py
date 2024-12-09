@@ -48,8 +48,6 @@ def convert_to_jalali(gregorian_date):
         return None
 
 
-
-
 # Database connection function
 def connect_db():
     conn = psycopg2.connect(
@@ -170,7 +168,7 @@ def is_persian(text):
 def load_page(driver, url):
     driver.get(url)
 
-# Function to scrape app information
+
 def give_information_app(app_name, url):
     chrome_options = Options()
     chrome_options.add_argument("--headless")
@@ -180,9 +178,6 @@ def give_information_app(app_name, url):
     chrome_options.add_argument("--disable-cache")
     chrome_options.add_argument("--incognito")  
 
-    # # Explicitly set the Chrome binary path
-    # chrome_options.binary_location = "/usr/bin/google-chrome"
-
     driver = webdriver.Chrome(options=chrome_options)
     # Set a longer page load timeout
     driver.set_page_load_timeout(350)
@@ -191,34 +186,47 @@ def give_information_app(app_name, url):
     max_retries = 5  # Set a limit to retries
 
     while retry_count < max_retries:
-
         try:
             load_page(driver, url)
-        except TimeoutException:
-            print(f"Failed to load the page for app ID {app_name} after retries.")
-            driver.quit()
-            return
+            wait = WebDriverWait(driver, 20)
+            
+            # Wait for the main app details
+            wait.until(EC.presence_of_element_located((By.CLASS_NAME, 'AppDetails__col')))
 
-        wait = WebDriverWait(driver, 10)
-        wait.until(EC.presence_of_element_located((By.CLASS_NAME, 'AppCommentsList__loadmore')))
-        App_info_zone = driver.find_element(By.CLASS_NAME, 'AppDetails__col')
-        App_Name = App_info_zone.find_element(By.CLASS_NAME, 'AppName').text
+            # Wait for the "Load more" button
+            try:
+                wait.until(EC.presence_of_element_located((By.CLASS_NAME, 'AppCommentsList__loadmore')))
+            except TimeoutException:
+                print(f"'Load more' button not found for {url}. Proceeding without it.")
+            
+            App_info_zone = driver.find_element(By.CLASS_NAME, 'AppDetails__col')
+            App_Name = App_info_zone.find_element(By.CLASS_NAME, 'AppName').text
 
-        if is_persian(App_Name):
-            print("App information loaded in Persian.")
-            break  # Exit the loop if the text is in Persian
-        else:
-            print("App information is in English; retrying...")
+            if is_persian(App_Name):
+                print("App information loaded in Persian.")
+                break
+            else:
+                print("App information is in English; retrying...")
+                retry_count += 1
+                time.sleep(2)
+                driver.refresh()
+
+        except TimeoutException as e:
+            print(f"Timeout error while loading {url}: {e}")
             retry_count += 1
-            time.sleep(2)  # Wait a bit before retrying
-            driver.refresh()  # Refresh the page
+            continue
+        except Exception as e:
+            print(f"Error loading app details for {url}: {e}")
+            retry_count += 1
+            continue
 
     if retry_count == max_retries:
         print(f"Failed to load Persian information for {url} after several attempts.")
-    
-    # Proceed with saving only if Persian content was detected
-    if is_persian(App_Name):
-        # Scrape the app details
+        driver.quit()
+        return None
+
+    # If Persian content was detected, scrape the details
+    try:
         App_Name_Company = App_info_zone.find_element(By.CLASS_NAME, 'DetailsPageHeader__company').text
         App_Version = App_info_zone.find_element(By.CLASS_NAME, 'DetailsPageHeader__subtitles').text
         App_Install = App_info_zone.find_elements(By.CLASS_NAME, 'InfoCube__content')[0].text
@@ -229,25 +237,25 @@ def give_information_app(app_name, url):
         App_Last_Update = App_info_zone.find_elements(By.CLASS_NAME, 'InfoCube__content')[4].text
         App_Img = App_info_zone.find_element(By.TAG_NAME, 'img').get_attribute('src')
 
-        # Convert `app_img` to base64
         App_Img_Base64 = convert_image_to_base64(App_Img)
 
-        # Format data for database insertion, including the URL
+        APP_INFO = {
+            'App_Name': App_Name,
+            'App_Img': App_Img,
+            'App_Name_Company': App_Name_Company,
+            'App_Version': App_Version,
+            'App_Total_Rate': App_Total_Rate,
+            'App_Average_Rate': App_Average_Rate,
+            'App_Install': App_Install,
+            'App_Category': App_Category,
+            'App_Size': App_Size,
+            'App_Last_Update': App_Last_Update,
+            'App_URL': url,
+            'App_Img_Base64': App_Img_Base64
+        }
+    except Exception as e:
+        print(f"Error extracting app details: {e}")
+        APP_INFO = None
 
     driver.quit()
-    APP_INFO = {
-        'App_Name': App_Name,
-        'App_Img': App_Img,
-        'App_Name_Company': App_Name_Company,
-        'App_Version': App_Version,
-        'App_Total_Rate': App_Total_Rate,  # Correct spelling
-        'App_Average_Rate': App_Average_Rate,
-        'App_Install': App_Install,
-        'App_Category': App_Category,
-        'App_Size': App_Size,
-        'App_Last_Update': App_Last_Update,
-        'App_URL': url,
-        'App_Img_Base64': App_Img_Base64
-    }
-
     return APP_INFO
