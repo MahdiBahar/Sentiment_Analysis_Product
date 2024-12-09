@@ -1,3 +1,4 @@
+
 # Import libraries
 import psycopg2
 from selenium import webdriver
@@ -46,7 +47,6 @@ def convert_to_jalali(gregorian_date):
     except Exception as e:
         print(f"Error converting date {gregorian_date}: {e}")
         return None
-
 
 # Database connection function
 def connect_db():
@@ -156,7 +156,6 @@ def log_scrape(data, app_id, app_scraped_time, app_scraped_time_jalali):
     conn.commit()
     cursor.close()
     conn.close()
-
 
 # Function to check if text contains Persian characters
 def is_persian(text):
