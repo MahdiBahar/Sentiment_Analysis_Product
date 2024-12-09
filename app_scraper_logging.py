@@ -1,4 +1,3 @@
-
 # Import libraries
 import psycopg2
 from selenium import webdriver
@@ -38,7 +37,6 @@ def convert_image_to_base64(image_url):
 
 
 def convert_to_jalali(gregorian_date):
-    """Convert a Gregorian date to Jalali date in YYYYMMDD integer format."""
     try:
         if isinstance(gregorian_date, str):
             gregorian_date = datetime.strptime(gregorian_date, "%Y-%m-%d").date()
@@ -47,6 +45,7 @@ def convert_to_jalali(gregorian_date):
     except Exception as e:
         print(f"Error converting date {gregorian_date}: {e}")
         return None
+
 
 # Database connection function
 def connect_db():
@@ -59,11 +58,12 @@ def connect_db():
     )
     return conn
 
-# Function to get URLs from the `urls_to_crawl` table
+# Function to get URLs from the `app_info` table
 def fetch_urls_to_crawl():
     conn = connect_db()
     cursor = conn.cursor()
-    cursor.execute("SELECT crawl_app_name, crawl_url FROM public.url_to_crawl")
+    cursor.execute("""SELECT app_id, app_url FROM public.app_info
+                   """)
     urls = cursor.fetchall()
     cursor.close()
     conn.close()
@@ -93,7 +93,6 @@ def get_or_create_app_id(data):
             app_category = %s,
             app_size = %s,
             app_last_update = %s,
-            app_url = %s,
             app_img_base64 = %s
         WHERE app_id = %s;
         """
@@ -101,34 +100,11 @@ def get_or_create_app_id(data):
             data['App_Img'], data['App_Name_Company'], data['App_Version'],
             data['App_Total_Rate'], data['App_Average_Rate'], data['App_Install'],
             data['App_Category'], data['App_Size'], data['App_Last_Update'], 
-            data['App_URL'], data['App_Img_Base64'], app_id
+            data['App_Img_Base64'], app_id
         ))
     else:
-        # App doesn't exist, insert it into app_info
-        insert_query = """
-        INSERT INTO app_info (
-            app_name, app_img, app_name_company, app_version, app_total_rate, 
-            app_average_rate, app_install, app_category, app_size, app_last_update, 
-            app_url, app_img_base64
-        ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-        RETURNING app_id;
-        """
-        cursor.execute(insert_query, (
-            data['App_Name'], data['App_Img'], data['App_Name_Company'], data['App_Version'],
-            data['App_Total_Rate'], data['App_Average_Rate'], data['App_Install'],
-            data['App_Category'], data['App_Size'], data['App_Last_Update'], 
-            data['App_URL'], data['App_Img_Base64']
-        ))
-        app_id = cursor.fetchone()[0]  # Retrieve the new app_id after insertion
-        # Reset the sequence after insert to ensure sequential IDs
-    
-    conn.commit()
-
-    reset_query = """
-    SELECT setval(pg_get_serial_sequence('app_info', 'app_id'), COALESCE(MAX(app_id), 1)) FROM app_info;
-    """
-    cursor.execute(reset_query)
-    conn.commit()
+        
+        print('An error has ecurred')
     
     cursor.close()
     conn.close()
@@ -157,6 +133,7 @@ def log_scrape(data, app_id, app_scraped_time, app_scraped_time_jalali):
     cursor.close()
     conn.close()
 
+
 # Function to check if text contains Persian characters
 def is_persian(text):
     """Checks if the text contains Persian characters."""
@@ -167,7 +144,7 @@ def is_persian(text):
 def load_page(driver, url):
     driver.get(url)
 
-
+# Function to scrape app information
 def give_information_app(app_name, url):
     chrome_options = Options()
     chrome_options.add_argument("--headless")
