@@ -62,7 +62,8 @@ def connect_db():
 def fetch_urls_to_crawl():
     conn = connect_db()
     cursor = conn.cursor()
-    cursor.execute("""SELECT app_id, app_url FROM public.app_info
+    cursor.execute("""SELECT app_id, app_nickname, app_url FROM public.app_info
+                   WHERE deleted = FALSE
                    """)
     urls = cursor.fetchall()
     cursor.close()
@@ -112,21 +113,21 @@ def get_or_create_app_id(data):
 
 
 # Function to log each scrape with an explicit scraped_time
-def log_scrape(data, app_id, app_scraped_time, app_scraped_time_jalali):
+def log_scrape(data, app_id, app_nickname,app_scraped_time, app_scraped_time_jalali):
     conn = connect_db()
     cursor = conn.cursor()
     log_query = """
     INSERT INTO log_app (
         app_id, app_name, app_name_company, app_version, app_total_rate, 
         app_average_rate, app_install, app_category, app_size, 
-        app_last_update, app_scraped_time, app_scraped_time_jalali,app_img, app_img_base64
-    ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s,%s);
+        app_last_update, app_scraped_time, app_scraped_time_jalali,app_img, app_img_base64,app_nickname
+    ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s,%s,%s);
     """
     cursor.execute(log_query, (
         app_id, data['App_Name'], data['App_Name_Company'], data['App_Version'],
         data['App_Total_Rate'], data['App_Average_Rate'], data['App_Install'],
         data['App_Category'], data['App_Size'], data['App_Last_Update'], 
-        app_scraped_time, app_scraped_time_jalali ,data['App_Img'], data['App_Img_Base64']
+        app_scraped_time, app_scraped_time_jalali ,data['App_Img'], data['App_Img_Base64'],app_nickname
     ))
 
     conn.commit()
