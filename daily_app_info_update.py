@@ -29,9 +29,9 @@ def run_daily_task():
                 app_scraped_time = datetime.now() # Capture the current time when the scraping session starts
                 app_scraped_time_jalali = convert_to_jalali(app_time_now)
             
-                for app_id, crawl_app_nickname, crawl_url in urls_to_crawl:
+                for app_id, crawl_app_nickname, crawl_url, last_base_64 in urls_to_crawl:
                     print(f"Scraping {crawl_app_nickname} at {crawl_url}")
-                    app_data = give_information_app(crawl_app_nickname, crawl_url)
+                    app_data = give_information_app(crawl_app_nickname, crawl_url, last_base_64)
 
                     if app_data:
                         # Update app_info and retrieve the app_id

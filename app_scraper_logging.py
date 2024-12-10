@@ -21,7 +21,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # Function to download an image and convert it to a base64 string
-def convert_image_to_base64(image_url):
+def convert_image_to_base64(image_url,last_base_64):
     try:
         response = requests.get(image_url)
         # Check if the request was successful
@@ -33,7 +33,7 @@ def convert_image_to_base64(image_url):
         return base64_img
     except requests.exceptions.RequestException as e:
         print(f"Error fetching image from {image_url}: {e}")
-        return None
+        return last_base_64
 
 
 def convert_to_jalali(gregorian_date):
@@ -62,7 +62,7 @@ def connect_db():
 def fetch_urls_to_crawl():
     conn = connect_db()
     cursor = conn.cursor()
-    cursor.execute("""SELECT app_id, app_nickname, app_url FROM public.app_info
+    cursor.execute("""SELECT app_id, app_nickname, app_url, app_img_base64 FROM public.app_info
                    WHERE deleted = FALSE
                    """)
     urls = cursor.fetchall()
@@ -146,7 +146,7 @@ def load_page(driver, url):
     driver.get(url)
 
 # Function to scrape app information
-def give_information_app(app_name, url):
+def give_information_app(app_name, url, last_base_64):
     chrome_options = Options()
     chrome_options.add_argument("--headless")
     chrome_options.add_argument("--lang=fa")  
@@ -214,7 +214,7 @@ def give_information_app(app_name, url):
         App_Last_Update = App_info_zone.find_elements(By.CLASS_NAME, 'InfoCube__content')[4].text
         App_Img = App_info_zone.find_element(By.TAG_NAME, 'img').get_attribute('src')
 
-        App_Img_Base64 = convert_image_to_base64(App_Img)
+        App_Img_Base64 = convert_image_to_base64(App_Img,last_base_64)
 
         APP_INFO = {
             'App_Name': App_Name,
