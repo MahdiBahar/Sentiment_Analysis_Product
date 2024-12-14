@@ -82,7 +82,7 @@ def check_and_create_app_id(data):
 
 
         if result:
-            print(f"{data['App_Nickname']} exists. Try again to add another application")
+            print(f"{data['App_Nickname']} with {data['App_URL']} exists. Try again to add another application")
 
             report = 'Duplicate URL'
         else:
@@ -142,7 +142,7 @@ def load_page(driver, url):
     driver.get(url)
 
 # Function to scrape app information
-def give_information_app(app_nickname, url):
+def give_information_app(url , app_nickname = 'unknown'):
     chrome_options = Options()
     chrome_options.add_argument("--headless")
     chrome_options.add_argument("--lang=fa")  
@@ -232,40 +232,3 @@ def give_information_app(app_nickname, url):
 
     driver.quit()
     return APP_INFO
-
-# Main loop to fetch URLs from the database and scrape them
-def main():
-    # urls_to_crawl = fetch_urls_to_crawl() 
-
-    # app_time_now = datetime.now() # Capture the current time when the scraping session starts
-    # app_scraped_time = datetime.now() # Capture the current time when the scraping session starts
-    # app_scraped_time_jalali = convert_to_jalali(app_time_now)
- 
-    # crawl_app_nickname= 'refah'
-    # crawl_url= "https://cafebazaar.ir/app/com.refahbank.dpi.android?l=fa"
-
-    crawl_app_nickname ='squid game'
-    crawl_url = 'https://cafebazaar.ir/app/com.defugames.survivegame'
-
-
-    # crawl_app_nickname = 'keyboard'
-    # crawl_url ='https://cafebazaar.ir/app/com.ziipin.softkeyboard.iran'
-
-    app_data = give_information_app(crawl_app_nickname, crawl_url)
-    report = check_and_create_app_id(app_data)
-    print(report)
-
-    # for app_id, crawl_app_nickname, crawl_url in urls_to_crawl:
-    #     print(f"Scraping {crawl_app_nickname} at {crawl_url}")
-    #     app_data = give_information_app(crawl_app_nickname, crawl_url)
-
-    #     if app_data:
-    #         # # Update app_info and retrieve the app_id
-    #         app_id = get_or_create_app_id(app_data)
-
-            # Log the scrape with the explicit scraped_time
-            # log_scrape(app_data, app_id, crawl_app_nickname,app_scraped_time, app_scraped_time_jalali)
-
-
-if __name__ == "__main__":
-    main()
