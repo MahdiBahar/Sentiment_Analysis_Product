@@ -50,10 +50,9 @@ def fetch_comments_to_analyze(app_id):
     query = """
         SELECT comment_id, comment_text , comment_rating
         FROM comment 
-        WHERE app_id = %s AND sentiment_score IS NULL
+        WHERE app_id = %s   AND sentiment_score IS NULL
         ;
     """
-    # ###LIMIT 100
     cursor.execute(query, (app_id,))
     comments = cursor.fetchall()
     cursor.close()
@@ -155,12 +154,3 @@ def analyze_and_update_sentiment(app_ids):
                 continue
             # Add a delay between each analysis
             time.sleep(0.3)  # 300ms delay
-
-if __name__ == "__main__":
-    try:
-        app_ids = list(map(int,os.getenv("APP_IDS","4").split(",")))
-        print(f'app_ids = {app_ids}')
-        # app_id = int(os.getenv("APP_ID", "28"))  # Fetch app_id from environment variables (default: 28)
-        analyze_and_update_sentiment(app_ids)
-    except KeyboardInterrupt:
-        print("Script interrupted. Exiting gracefully....")
