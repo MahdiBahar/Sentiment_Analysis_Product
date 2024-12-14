@@ -228,15 +228,3 @@ def crawl_comments(app_id, app_url):
     save_details_to_app_info(app_id, count_scraped_comments, new_comments_count, comment_scraped_time)
 
     driver.quit()
-
-# Main function for crawling comments
-def main():
-    apps = fetch_app_urls_to_crawl()
-    for app_id, app_url in apps:
-        print(f"Crawling comments for app at {app_url}")
-        if (app_id==28):
-            crawl_comments(app_id, app_url)
-
-
-if __name__ == "__main__":
-    main()
