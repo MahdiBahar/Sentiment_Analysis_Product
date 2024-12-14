@@ -82,11 +82,22 @@ def save_details_to_app_info(app_id, count_scraped_comments, count_new_comments,
 
 
 # Fetch app_ids and app_urls from the app_info table
-def fetch_app_urls_to_crawl():
+def fetch_app_urls_to_crawl(app_ids=None):
     """Fetch app IDs and URLs to crawl from the app_info table."""
     conn = connect_db()
     cursor = conn.cursor()
-    cursor.execute("SELECT app_id, app_url FROM public.app_info")
+    if app_ids:
+        query = """SELECT app_id, app_url FROM public.app_info WHERE app_id = ANY(%s)
+
+        AND active = TRUE AND deleted = FALSE
+
+        """
+        cursor.execute(query, (app_ids,))
+    else:
+        query = "SELECT app_id , app_url FROM public.app_info"
+        cursor.execute(query)
+
+
     apps = cursor.fetchall()
     cursor.close()
     conn.close()
