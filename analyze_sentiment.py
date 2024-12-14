@@ -28,7 +28,7 @@ SENTIMENT_SCORES = {
     "mixed": 0,
     "positive": 1,
     "very positive": 2,
-    "no sentiment expressed": 10
+    "no sentiment expressed": 0
 }
 
 # Database connection
@@ -50,10 +50,12 @@ def fetch_comments_to_analyze(app_id):
     query = """
         SELECT comment_id, comment_text , comment_rating
         FROM comment 
-        WHERE app_id = %s  AND sentiment_score IS NULL
+        WHERE app_id = %s  
         ;
     """
-
+  
+    ###### AND sentiment_score IS NULL
+    # ###LIMIT 100
     cursor.execute(query, (app_id,))
     comments = cursor.fetchall()
     cursor.close()
@@ -61,15 +63,15 @@ def fetch_comments_to_analyze(app_id):
     return comments
 
 # Update the comment table with the sentiment result and sentiment score
-def update_sentiment(comment_id, sentiment_result, sentiment_score, sentiment_processed):
+def update_sentiment(comment_id, sentiment_result, sentiment_score, second_model_processed):
     conn = connect_db()
     cursor = conn.cursor()
     query = """
         UPDATE comment 
-        SET sentiment_result = %s, sentiment_score = %s , sentiment_processed=%s 
+        SET sentiment_result = %s, sentiment_score = %s , second_model_processed=%s 
         WHERE comment_id = %s;
     """
-    cursor.execute(query, (sentiment_result, sentiment_score, sentiment_processed, comment_id))
+    cursor.execute(query, (sentiment_result, sentiment_score, second_model_processed, comment_id))
     conn.commit()
     cursor.close()
     conn.close()
@@ -128,9 +130,9 @@ def analyze_and_update_sentiment(app_ids):
         for comment_id, comment_text, comment_rating in comments:
             try:
                 sentiment_result = run_model(comment_text)
-                sentiment_processed=False
+                second_model_processed=False
                 # If the first model returns "non-sentiment", run the second model
-                if (sentiment_result.lower() == "no sentiment expressed" or sentiment_result.lower() == "mixed" ):
+                if (sentiment_result.lower() == "no sentiment expressed" or sentiment_result.lower() == "mixed" or sentiment_result.lower() == "neutral"):
                     
                     print(f"The current sentiment for this comment is {sentiment_result.lower()}")
                     second_model_result = run_second_model(comment_text)
@@ -138,20 +140,20 @@ def analyze_and_update_sentiment(app_ids):
                 # Apply conditional update logic based on second model result and rating
                     if second_model_result == "NEGATIVE" and comment_rating == 1 :
                         sentiment_result = "negative"
-                        sentiment_processed= True
+                        second_model_processed= True
                         print("second_model is used")
                     elif second_model_result == "POSITIVE" and comment_rating == 5:
                         sentiment_result = "positive"
-                        sentiment_processed= True
+                        second_model_processed= True
                         print("second_model is used")
                     # Otherwise, retain "no sentiment expressed"
 
                 sentiment_result, sentiment_score = validate_and_score_sentiment(sentiment_result)                
-                update_sentiment(comment_id, sentiment_result, sentiment_score,sentiment_processed)
+                update_sentiment(comment_id, sentiment_result, sentiment_score,second_model_processed)
                 print(f"Updated comment {comment_id} for id {app_id} with sentiment: {sentiment_result}, score: {sentiment_score}")
             except Exception as e:
                 print(f"Error processing comment {comment_id}: {e}")
-                update_sentiment(comment_id, "no sentiment expressed", 10, False)  # Assign fallback values
+                update_sentiment(comment_id, "Missed Value", 11, False)  # Assign fallback values
                 continue
             # Add a delay between each analysis
             time.sleep(0.3)  # 300ms delay
