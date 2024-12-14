@@ -50,11 +50,9 @@ def fetch_comments_to_analyze(app_id):
     query = """
         SELECT comment_id, comment_text , comment_rating
         FROM comment 
-        WHERE app_id = %s  
+        WHERE app_id = %s AND sentiment_score IS NULL
         ;
     """
-  
-    ###### AND sentiment_score IS NULL
     # ###LIMIT 100
     cursor.execute(query, (app_id,))
     comments = cursor.fetchall()
