@@ -82,12 +82,12 @@ def check_and_create_app_id(data):
 
 
         if result:
-            print(f"{data['App_Nickname']} with {data['App_URL']} exists. Try again to add another application")
+            # print(f"{data['App_Nickname']} with {data['App_URL']} exists. Try again to add another application")
 
-            report = 'Duplicate URL'
+            report = f'Duplicate URL. {data['App_Nickname']} with {data['App_URL']} exists. Try again to add another application'
         else:
 
-            if data['App_Category'] == "امور مالی":
+            if data['App_Category'] == "امور مالی" or data['App_Category'] == "شبکه‌های اجتماعی":
 
                             # App doesn't exist, insert it into app_info
                 insert_query = """
@@ -125,7 +125,7 @@ def check_and_create_app_id(data):
 
     except Exception as e:
             print(f"Error happened: {e}")
-            report = 'Something happened. probably the url is not correct'
+            report = 'Something happened. Check the connection or validity of URL'
 
 
     return report
@@ -142,7 +142,7 @@ def load_page(driver, url):
     driver.get(url)
 
 # Function to scrape app information
-def give_information_app(url , app_nickname = 'unknown'):
+def give_information_app(app_nickname, url):
     chrome_options = Options()
     chrome_options.add_argument("--headless")
     chrome_options.add_argument("--lang=fa")  
