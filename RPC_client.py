@@ -1,25 +1,22 @@
-
-
 import requests
-import json
+import time
 
 def make_request(method, params):
     url = "http://localhost:5000"
     headers = {"Content-Type": "application/json"}
-    
-    # Constructing the request payload
+
+    # Construct the request payload
     request_payload = {
         "jsonrpc": "2.0",
         "method": method,
         "params": params,
         "id": 1
     }
-    
-    # Sending the request to the server
+
+    # Send the request to the server
     response = requests.post(url, headers=headers, json=request_payload)
-    
-    # Handling the response
-    print(f"----status : {response.status_code}")
+
+    # Handle the response
     if response.status_code == 200:
         response_json = response.json()
         print("Full response:", response_json) 
@@ -31,34 +28,41 @@ def make_request(method, params):
         raise Exception(f"HTTP Error: {response.status_code} - {response.text}")
 
 
-#####Test 
+def start_and_track_task(method, params=None):
 
-# crawl_app_nickname ='squid game'
-# crawl_url = 'https://cafebazaar.ir/app/com.defugames.survivegame'
-# crawl_app_nickname = 'keyboard'
-# crawl_url ='https://cafebazaar.ir/app/com.ziipin.softkeyboard.iran'
 
-# crawl_app_nickname ='squid game'
-# crawl_url = 'https://www.geeksforgeeks.org/postgresql-drop-table'
-# crawl_app_nickname= 'refah'
-crawl_url= "https://cafebazaar.ir/app/com.refahbank.dpi.android"
-# crawl_url = 'https://cafebazaar.ir/app/com.sibche.aspardproject.app'
+    try:
+        # Start the task
+        result = make_request(method, params)
+        if not result or "task_id" not in result:
+            print(f"Failed to start task for method {method}")
+            return
 
-# crawl_url = 'https://cafebazaar.ir/app/com.sibche.aspardproject.app'
+        task_id = result["task_id"]
+        print(f"Task {method} started with task_id: {task_id}")
+
+        # Track the progress of the task
+        while True:
+            status_result = make_request("check_task_status", {"task_id": task_id})
+            print(f"Task {method} status: {status_result}")
+
+            # Stop polling when the task is completed or failed
+            if status_result["status"] in ("completed", "failed"):
+                break
+
+            # Wait before polling again
+            time.sleep(100)
+
+    except Exception as e:
+        print(f"Error in {method}: {e}")
 
 
 if __name__ == "__main__":
-    try:
-        # app_ids = [28]  
-        # result_comment_crawl = make_request("crawl_comment", {"app_ids": app_ids})
-        # print(f"Result of crawl_comment: {result_comment_crawl}")
-        
-        # result_sentiment = make_request("sentiment_analysis", {"app_ids": app_ids})
-        # print(f"Result of sentiment_comment: {result_sentiment}")
+    app_ids = [1,2,3,4,5]  # Example app IDs
 
-        result_check_add_url = make_request("check_add_url",{"crawl_url": crawl_url})
-        print(f"Result of check url to add or ignore is that {result_check_add_url}")
+    print("Starting crawl_comment task...")
+    start_and_track_task("crawl_comment", {"app_ids": app_ids})
 
-    except Exception as e:
-        print(f"Error: {e}")
+    print("\nStarting sentiment_analysis task...")
+    start_and_track_task("sentiment_analysis", {"app_ids": app_ids})
 
