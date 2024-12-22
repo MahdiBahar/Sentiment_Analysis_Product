@@ -84,7 +84,8 @@ def check_and_create_app_id(data):
         if result:
             # print(f"{data['App_Nickname']} with {data['App_URL']} exists. Try again to add another application")
 
-            report = f'Duplicate URL. {data['App_Nickname']} with {data['App_URL']} exists. Try again to add another application'
+            long_report = f'Duplicate URL. {data['App_Nickname']} with {data['App_URL']} exists. Try again to add another application'
+            short_report = "Dplicate"
         else:
 
             if data['App_Category'] == "امور مالی" or data['App_Category'] == "شبکه‌های اجتماعی":
@@ -105,12 +106,12 @@ def check_and_create_app_id(data):
                     data['App_URL'], data['App_Img_Base64'], data['App_Nickname']
                 ))
                 app_id = cursor.fetchone()[0]  # Retrieve the new app_id after insertion
-                report = 'New URL is added'
-                
+                long_report = 'New URL is added'
+                short_report='Valid'
 
             else:
-                report = 'URL is valid but this application is not related to Financial Applications'
-
+                long_report = 'URL is valid but this application is not related to Financial Applications'
+                short_report = 'Irrilavant'
         conn.commit()
         # Reset the sequence after insert to ensure sequential IDs
         
@@ -123,12 +124,14 @@ def check_and_create_app_id(data):
         cursor.close()
         conn.close()
 
+    
     except Exception as e:
             print(f"Error happened: {e}")
-            report = 'Something happened. Check the connection or validity of URL'
+            long_report = 'Something happened. Check the connection or validity of URL'
+            short_report = 'Connection-Error'
 
+    return [long_report,short_report]
 
-    return report
 
 
 # Function to check if text contains Persian characters
