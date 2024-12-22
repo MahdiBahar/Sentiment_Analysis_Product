@@ -74,31 +74,60 @@ def connect_db():
     return conn
 
 
-# Function to get URLs from the `urls_to_crawl` table
-def fetch_urls_to_crawl():
-    conn = connect_db()
-    cursor = conn.cursor()
-    cursor.execute("SELECT app_id, app_nickname, app_url FROM public.app_info")
-    urls = cursor.fetchall()
-    cursor.close()
-    conn.close()
-    return urls
-
-
 def check_and_create_app_id(data):
     conn = connect_db()
     cursor = conn.cursor()
 
     try:
         # Check if app already exists in app_info
-        select_query = "SELECT app_id FROM app_info WHERE app_name = %s;"
-        cursor.execute(select_query, (data['App_Name'],))
+        select_query = "SELECT app_id, deleted FROM app_info WHERE app_name = %s AND app_nickname = %s;"
+        cursor.execute(select_query, (data['App_Name'], data['App_Nickname']))
         result = cursor.fetchone()
 
-        if result:
+        if result[0]:
             
-            long_report = f'Duplicate URL. {data['App_Nickname']} with {data['App_URL']} exists. Try again to add another application'
-            short_report = "Duplicate"
+            if result[1]:
+                app_id = result[0]  # Assuming result[0] contains the correct app_id
+
+                update_query = """
+                    UPDATE app_info
+                    SET 
+                        app_name = %s, 
+                        app_img = %s, 
+                        app_name_company = %s, 
+                        app_version = %s, 
+                        app_total_rate = %s, 
+                        app_average_rate = %s, 
+                        app_install = %s, 
+                        app_category = %s, 
+                        app_size = %s, 
+                        app_last_update = %s, 
+                        app_url = %s, 
+                        app_img_base64 = %s, 
+                        app_nickname = %s, 
+                        deleted = %s
+                    WHERE app_id = %s;
+                """
+
+                cursor.execute(update_query, (
+                    data['App_Name'], data['App_Img'], data['App_Name_Company'], data['App_Version'],
+                    data['App_Total_Rate'], data['App_Average_Rate'], data['App_Install'],
+                    data['App_Category'], data['App_Size'], data['App_Last_Update'], 
+                    data['App_URL'], data['App_Img_Base64'], data['App_Nickname'], False, app_id
+                ))
+
+
+                # app_id = cursor.fetchone()[0]  # Retrieve the new app_id after insertion
+                long_report = 'Deleted app is back'
+                short_report = 'deleted-back'
+                conn.commit()
+
+
+
+            else:
+
+                long_report = f'Duplicate URL. {data['App_Nickname']} with {data['App_URL']} exists. Try again to add another application'
+                short_report = "Duplicate"
         else:
             if data['App_Category'] == "امور مالی" or data['App_Category'] == "شبکه‌های اجتماعی":
 
