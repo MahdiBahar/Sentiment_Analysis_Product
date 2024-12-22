@@ -115,42 +115,35 @@ def validate_and_score_sentiment(sentiment_result):
     return sentiment_result, sentiment_score
 
 # Main function to fetch comments for a specific app_id and update sentiments
-def analyze_and_update_sentiment(app_ids):
+def analyze_and_update_sentiment(comments,app_id):
     
-    for app_id in app_ids:
-        print(f"Processing comments for app_id: {app_id}")
-        comments = fetch_comments_to_analyze(app_id)
-        if not comments:
-            print("No more comments to analyze.")
-            continue
-
-        for comment_id, comment_text, comment_rating in comments:
-            try:
-                sentiment_result = run_model(comment_text)
-                second_model_processed=False
-                # If the first model returns "non-sentiment", run the second model
-                if (sentiment_result.lower() == "no sentiment expressed" or sentiment_result.lower() == "mixed" or sentiment_result.lower() == "neutral"):
+    for comment_id, comment_text, comment_rating in comments:
+        try:
+            sentiment_result = run_model(comment_text)
+            second_model_processed=False
+            # If the first model returns "non-sentiment", run the second model
+            if (sentiment_result.lower() == "no sentiment expressed" or sentiment_result.lower() == "mixed" or sentiment_result.lower() == "neutral"):
                     
-                    print(f"The current sentiment for this comment is {sentiment_result.lower()}")
-                    second_model_result = run_second_model(comment_text)
+                print(f"The current sentiment for this comment is {sentiment_result.lower()}")
+                second_model_result = run_second_model(comment_text)
 
-                # Apply conditional update logic based on second model result and rating
-                    if second_model_result == "NEGATIVE" and comment_rating == 1 :
-                        sentiment_result = "negative"
-                        second_model_processed= True
-                        print("second_model is used")
-                    elif second_model_result == "POSITIVE" and comment_rating == 5:
-                        sentiment_result = "positive"
-                        second_model_processed= True
-                        print("second_model is used")
-                    # Otherwise, retain "no sentiment expressed"
+            # Apply conditional update logic based on second model result and rating
+                if second_model_result == "NEGATIVE" and comment_rating == 1 :
+                    sentiment_result = "negative"
+                    second_model_processed= True
+                    print("second_model is used")
+                elif second_model_result == "POSITIVE" and comment_rating == 5:
+                    sentiment_result = "positive"
+                    second_model_processed= True
+                    print("second_model is used")
+                # Otherwise, retain "no sentiment expressed"
 
-                sentiment_result, sentiment_score = validate_and_score_sentiment(sentiment_result)                
-                update_sentiment(comment_id, sentiment_result, sentiment_score,second_model_processed)
-                print(f"Updated comment {comment_id} for id {app_id} with sentiment: {sentiment_result}, score: {sentiment_score}")
-            except Exception as e:
-                print(f"Error processing comment {comment_id}: {e}")
-                update_sentiment(comment_id, "Missed Value", 11, False)  # Assign fallback values
-                continue
-            # Add a delay between each analysis
-            time.sleep(0.3)  # 300ms delay
+            sentiment_result, sentiment_score = validate_and_score_sentiment(sentiment_result)                
+            update_sentiment(comment_id, sentiment_result, sentiment_score,second_model_processed)
+            print(f"Updated comment {comment_id} for id {app_id} with sentiment: {sentiment_result}, score: {sentiment_score}")
+        except Exception as e:
+            print(f"Error processing comment {comment_id}: {e}")
+            update_sentiment(comment_id, "Missed Value", 11, False)  # Assign fallback values
+            continue
+        # Add a delay between each analysis
+        time.sleep(0.3)  # 300ms delay
