@@ -12,6 +12,9 @@ from analyze_sentiment import analyze_and_update_sentiment, fetch_comments_to_an
 tasks_status = {}
 tasks_lock = threading.Lock()
 
+# Event for synchronization
+crawl_event = threading.Event()  # Signaled when crawling is complete
+
 
 class RequestHandler(BaseHTTPRequestHandler):
     def do_POST(self):
@@ -47,8 +50,9 @@ def perform_task(task_id, task_function, *args):
 
 @dispatcher.add_method
 def crawl_comment(app_ids):
-    global tasks_status
+    global tasks_status, crawl_event
 
+    crawl_event.clear()
     # Generate a unique task ID
     # task_id = str(uuid.uuid4())
     task_id = '1'
@@ -58,14 +62,24 @@ def crawl_comment(app_ids):
         tasks_status[task_id] = {"status": "started", "description": "Crawling comments"}
 
     # Start the task in a separate thread
-    threading.Thread(target=perform_task, args=(task_id, fetch_and_crawl_comments, app_ids)).start()
+    # Start the task in a separate thread
+    def wrapped_task():
+        try:
+            fetch_and_crawl_comments(app_ids)
+        finally:
+            crawl_event.set()  # Signal that crawling is complete
 
-    return {"task_id": task_id, "message": "Task started: Crawling comments"}
+    threading.Thread(target=perform_task, args=(task_id, wrapped_task)).start()
+
+
+    # threading.Thread(target=perform_task, args=(task_id, fetch_and_crawl_comments, app_ids)).start()
+
+    return {"task_id": task_id,"message": "Task started: Crawling comments"}
 
 
 @dispatcher.add_method
 def sentiment_analysis(app_ids):
-    global tasks_status
+    global tasks_status,crawl_event
 
     # Generate a unique task ID
     # task_id = str(uuid.uuid4())
@@ -74,8 +88,15 @@ def sentiment_analysis(app_ids):
     with tasks_lock:
         tasks_status[task_id] = {"status": "started", "description": "Performing sentiment analysis"}
 
+        # Start the task in a separate thread
+    def wrapped_task():
+        crawl_event.wait()  # Wait for crawling to complete
+        analyze_sentiments(app_ids)
+     
+    threading.Thread(target=perform_task, args=(task_id, wrapped_task)).start()
+
     # Start the task in a separate thread
-    threading.Thread(target=perform_task, args=(task_id, analyze_sentiments, app_ids)).start()
+    # threading.Thread(target=perform_task, args=(task_id, analyze_sentiments, app_ids)).start()
 
     return {"task_id": task_id, "message": "Task started: Sentiment analysis"}
 
@@ -132,5 +153,6 @@ def analyze_sentiments(app_ids):
 # Run the server
 if __name__ == "__main__":
     print("Server running on port 5000...")
+    crawl_event.set()
     server = HTTPServer(("0.0.0.0", 5000), RequestHandler)
     server.serve_forever()
