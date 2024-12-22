@@ -1,108 +1,136 @@
 from jsonrpc import JSONRPCResponseManager, dispatcher
 from http.server import BaseHTTPRequestHandler, HTTPServer
 import threading
+import time
+import uuid
 from comment_scraper import fetch_app_urls_to_crawl, crawl_comments
 from app_scraper_check import give_information_app, check_and_create_app_id
 from analyze_sentiment import analyze_and_update_sentiment, fetch_comments_to_analyze
 
-# Global variable to track i server is busy or not
-is_busy = threading.Lock()
-current_task = None
+
+# Global dictionary to track tasks
+tasks_status = {}
+tasks_lock = threading.Lock()
+
 
 class RequestHandler(BaseHTTPRequestHandler):
     def do_POST(self):
         content_length = int(self.headers['Content-Length'])
         request = self.rfile.read(content_length).decode()
-        
         response = JSONRPCResponseManager.handle(request, dispatcher)
+        
         self.send_response(200)
         self.send_header("Content-Type", "application/json")
         self.end_headers()
         self.wfile.write(response.json.encode())
 
 
-@dispatcher.add_method
-def crawl_comment(app_ids):
+# Helper function to simulate long tasks
+def perform_task(task_id, task_function, *args):
+    global tasks_status
 
-    global is_busy , current_task
-
-    # Try to acquire the lock to check if the server is busy
-    if not is_busy.acquire(blocking=False):
-        return {"status": "busy", "message": f"Server is currently processing another request : {current_task}"}
-
-    current_task = "crawl_comment"
+    # Update task status to "working"
+    with tasks_lock:
+        tasks_status[task_id] = {"status": "working", "description": tasks_status[task_id]["description"]}
 
     try:
-        print("Starting crawling comments")
-        apps = fetch_app_urls_to_crawl(app_ids)
-        for app_id, app_url in apps:
-            print(f"Crawling comments for app at {app_url}")
-            crawl_comments(app_id, app_url)
-        return {"status of crawling comments": "success", "app_id": app_id}
-    
+        # Execute the actual task function
+        task_function(*args)
+        # Update task status to "completed"
+        with tasks_lock:
+            tasks_status[task_id]["status"] = "completed"
     except Exception as e:
-        print(e)
-        return {"status of crawling comments": "failed", "details of error" : e}
-    finally:
-        current_task = None
-        is_busy.release()
+        # Update task status to "failed"
+        with tasks_lock:
+            tasks_status[task_id] = {"status": "failed", "description": tasks_status[task_id]["description"], "error": str(e)}
+
+
+@dispatcher.add_method
+def crawl_comment(app_ids):
+    global tasks_status
+
+    # Generate a unique task ID
+    # task_id = str(uuid.uuid4())
+    task_id = '1'
+
+    # Immediately respond that the task has started
+    with tasks_lock:
+        tasks_status[task_id] = {"status": "started", "description": "Crawling comments"}
+
+    # Start the task in a separate thread
+    threading.Thread(target=perform_task, args=(task_id, fetch_and_crawl_comments, app_ids)).start()
+
+    return {"task_id": task_id, "message": "Task started: Crawling comments"}
 
 
 @dispatcher.add_method
 def sentiment_analysis(app_ids):
+    global tasks_status
 
-    global is_busy , current_task
-    # Try to acquire the lock to check if the server is busy
-    if not is_busy.acquire(blocking=False):
-        return {"status": "busy", "message": f"Server is currently processing another request: {current_task}"}
+    # Generate a unique task ID
+    # task_id = str(uuid.uuid4())
+    task_id = '2'
+    # Immediately respond that the task has started
+    with tasks_lock:
+        tasks_status[task_id] = {"status": "started", "description": "Performing sentiment analysis"}
 
-    current_task = "sentiment_analysis"
+    # Start the task in a separate thread
+    threading.Thread(target=perform_task, args=(task_id, analyze_sentiments, app_ids)).start()
 
-    try:
-
-        for app_id in app_ids:
-            print(f"Processing comments for app_id: {app_id}")
-            comments = fetch_comments_to_analyze(app_id)
-            if not comments:
-                print("No more comments to analyze.")
-
-                return {"staus of sentiment analysis" : "no more comments to analyze" , "app_id": app_id}
-                # continue
-            analyze_and_update_sentiment(comments, app_id)
-
-            return {"status of sentiment analysis": "success", "app_id":app_id}
-    
-    # except KeyboardInterrupt:
-    except Exception as e:
-
-        print(f"Script interrupted because {e}")
-        return {"status of sentiment analysis": "failed", "details of error" : e}
-    finally:
-        current_task = None
-        is_busy.release()
+    return {"task_id": task_id, "message": "Task started: Sentiment analysis"}
 
 
-
-# By considering getting nickname
 @dispatcher.add_method
-def check_add_url(crawl_url, crawl_app_nickname = 'unknown'):
-
-    global current_task
-
+def check_add_url(crawl_url, crawl_app_nickname='unknown'):
+    # This method is lightweight and does not require asynchronous tracking
     selected_domain = crawl_url.split('/')[2]
 
-    current_task = "add_url"
     if selected_domain == "cafebazaar.ir":
         app_data = give_information_app(crawl_app_nickname, crawl_url)
-        report = check_and_create_app_id(app_data)
-        print(report)
+        [long_report, short_report] = check_and_create_app_id(app_data)
+        print(long_report)
     else:
-        report = f'The {crawl_url} is not related to Cafebazar or not valid. Please try again'
-        print(report)
-    return report
+        long_report = f"The {crawl_url} is not related to Cafebazar or not valid. Please try again"
+        short_report = 'Bad-URL'
+        print(long_report)
+    return {"status": short_report, "message": long_report}
 
-# Run server
+
+@dispatcher.add_method
+def check_task_status(task_id):
+    global tasks_status
+
+    # Check the status of the given task
+    with tasks_lock:
+        if task_id in tasks_status:
+            return tasks_status[task_id]
+        else:
+            return {"status": "error", "message": "Task ID not found"}
+
+
+# Task-specific implementations
+def fetch_and_crawl_comments(app_ids):
+    print("Fetching app URLs and crawling comments...")
+    apps = fetch_app_urls_to_crawl(app_ids)
+    for app_id, app_url in apps:
+        print(f"Crawling comments for app at {app_url}")
+        crawl_comments(app_id, app_url)
+
+
+def analyze_sentiments(app_ids):
+    print("Analyzing sentiments...")
+    for app_id in app_ids:
+        comments = fetch_comments_to_analyze(app_id)
+        if not comments:
+            print(f"No comments left to analyze for app_id {app_id}")
+            continue
+        analyze_and_update_sentiment(comments, app_id)
+
+
+
+
+# Run the server
 if __name__ == "__main__":
     print("Server running on port 5000...")
-    server = HTTPServer(("localhost", 5000), RequestHandler)
+    server = HTTPServer(("0.0.0.0", 5000), RequestHandler)
     server.serve_forever()
