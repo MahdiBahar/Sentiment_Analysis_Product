@@ -1,11 +1,22 @@
+# pip install -r requirment.txt
 psycopg2-binary
 selenium
 tenacity
 tqdm
 pandas
 requests
+persiantools
 transformers          # For Hugging Face Transformers
 # # for using second model
 googletrans==4.0.0-rc1  # Google Translator API 
-dotenv
-jsonrpc
+python-dotenv
+json-rpc
+sentencepiece
+torch 
+torchvision 
+torchaudio
+-f https://download.pytorch.org/whl/cpu/torch_stable.html
+
+# python -c "from transformers import MT5ForConditionalGeneration, MT5Tokenizer; \
+#     MT5Tokenizer.from_pretrained('persiannlp/mt5-base-parsinlu-sentiment-analysis'); \
+#     MT5ForConditionalGeneration.from_pretrained('persiannlp/mt5-base-parsinlu-sentiment-analysis')"
