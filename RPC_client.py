@@ -40,7 +40,7 @@ def make_request(method, params):
 
 # crawl_app_nickname ='squid game'
 # crawl_url = 'https://www.geeksforgeeks.org/postgresql-drop-table'
-crawl_app_nickname= 'refah'
+# crawl_app_nickname= 'refah'
 crawl_url= "https://cafebazaar.ir/app/com.refahbank.dpi.android"
 # crawl_url = 'https://cafebazaar.ir/app/com.sibche.aspardproject.app'
 
@@ -55,8 +55,8 @@ if __name__ == "__main__":
         
         # result_sentiment = make_request("sentiment_analysis", {"app_ids": app_ids})
         # print(f"Result of sentiment_comment: {result_sentiment}")
-        
-        result_check_add_url = make_request("check_add_url",{"crawl_app_nickname": crawl_app_nickname, "crawl_url": crawl_url})
+
+        result_check_add_url = make_request("check_add_url",{"crawl_url": crawl_url})
         print(f"Result of check url to add or ignore is that {result_check_add_url}")
 
     except Exception as e:

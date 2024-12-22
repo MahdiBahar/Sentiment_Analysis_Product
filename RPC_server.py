@@ -1,8 +1,13 @@
 from jsonrpc import JSONRPCResponseManager, dispatcher
 from http.server import BaseHTTPRequestHandler, HTTPServer
+import threading
 from comment_scraper import fetch_app_urls_to_crawl, crawl_comments
 from app_scraper_check import give_information_app, check_and_create_app_id
 from analyze_sentiment import analyze_and_update_sentiment, fetch_comments_to_analyze
+
+# Global variable to track i server is busy or not
+is_busy = threading.Lock()
+current_task = None
 
 class RequestHandler(BaseHTTPRequestHandler):
     def do_POST(self):
@@ -18,10 +23,18 @@ class RequestHandler(BaseHTTPRequestHandler):
 
 @dispatcher.add_method
 def crawl_comment(app_ids):
-    # app_ids = [28,31]
-    apps = fetch_app_urls_to_crawl(app_ids)
-    try:
 
+    global is_busy , current_task
+
+    # Try to acquire the lock to check if the server is busy
+    if not is_busy.acquire(blocking=False):
+        return {"status": "busy", "message": f"Server is currently processing another request : {current_task}"}
+
+    current_task = "crawl_comment"
+
+    try:
+        print("Starting crawling comments")
+        apps = fetch_app_urls_to_crawl(app_ids)
         for app_id, app_url in apps:
             print(f"Crawling comments for app at {app_url}")
             crawl_comments(app_id, app_url)
@@ -30,9 +43,21 @@ def crawl_comment(app_ids):
     except Exception as e:
         print(e)
         return {"status of crawling comments": "failed", "details of error" : e}
+    finally:
+        current_task = None
+        is_busy.release()
+
 
 @dispatcher.add_method
 def sentiment_analysis(app_ids):
+
+    global is_busy , current_task
+    # Try to acquire the lock to check if the server is busy
+    if not is_busy.acquire(blocking=False):
+        return {"status": "busy", "message": f"Server is currently processing another request: {current_task}"}
+
+    current_task = "sentiment_analysis"
+
     try:
 
         for app_id in app_ids:
@@ -52,12 +77,21 @@ def sentiment_analysis(app_ids):
 
         print(f"Script interrupted because {e}")
         return {"status of sentiment analysis": "failed", "details of error" : e}
+    finally:
+        current_task = None
+        is_busy.release()
+
+
 
 # By considering getting nickname
 @dispatcher.add_method
 def check_add_url(crawl_url, crawl_app_nickname = 'unknown'):
+
+    global current_task
+
     selected_domain = crawl_url.split('/')[2]
 
+    current_task = "add_url"
     if selected_domain == "cafebazaar.ir":
         app_data = give_information_app(crawl_app_nickname, crawl_url)
         report = check_and_create_app_id(app_data)
