@@ -20,7 +20,6 @@ from dotenv import load_dotenv
 # Load environment variables from .env file
 load_dotenv()
 
-
 # Function to download an image and convert it to a base64 string
 def convert_image_to_base64(image_url):
     try:
