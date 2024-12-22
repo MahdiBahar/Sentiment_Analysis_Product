@@ -15,10 +15,27 @@ from io import BytesIO
 # to solve time out problem
 from tenacity import retry, wait_exponential, stop_after_attempt
 from selenium.common.exceptions import TimeoutException
-
+#for Extracting package name
+from urllib.parse import urlparse
 from dotenv import load_dotenv
 # Load environment variables from .env file
 load_dotenv()
+
+
+def extract_app_package_name(url):
+    try:
+        if not url.startswith(("http://", "https://")):
+            url = "http://" + url
+        parsed_url = urlparse(url)
+        hostname = parsed_url.hostname
+        if hostname == "cafebazaar.ir":
+            path = parsed_url.path.rstrip("/")
+            return path.split("/")[-1], None
+        return None, "host-error"
+    except Exception as e:
+        print(f"An error occurred: {e}")
+        return None, "url-error"
+
 
 # Function to download an image and convert it to a base64 string
 def convert_image_to_base64(image_url):
@@ -73,29 +90,32 @@ def check_and_create_app_id(data):
     cursor = conn.cursor()
 
     try:
-
         # Check if app already exists in app_info
         select_query = "SELECT app_id FROM app_info WHERE app_name = %s;"
         cursor.execute(select_query, (data['App_Name'],))
         result = cursor.fetchone()
 
-
         if result:
-            # print(f"{data['App_Nickname']} with {data['App_URL']} exists. Try again to add another application")
-
+            
             long_report = f'Duplicate URL. {data['App_Nickname']} with {data['App_URL']} exists. Try again to add another application'
-            short_report = "Dplicate"
+            short_report = "Duplicate"
         else:
-
             if data['App_Category'] == "امور مالی" or data['App_Category'] == "شبکه‌های اجتماعی":
 
-                            # App doesn't exist, insert it into app_info
+                # Reset the sequence after insert to ensure sequential IDs
+                reset_query = """
+                SELECT setval(pg_get_serial_sequence('app_info', 'app_id'), COALESCE(MAX(app_id), 1)) FROM app_info;
+                """
+                cursor.execute(reset_query)
+                conn.commit()
+
+                # App doesn't exist, insert it into app_info
                 insert_query = """
                 INSERT INTO app_info (
                     app_name, app_img, app_name_company, app_version, app_total_rate, 
                     app_average_rate, app_install, app_category, app_size, app_last_update, 
                     app_url, app_img_base64, app_nickname
-                ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s,%s)
+                ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                 RETURNING app_id;
                 """
                 cursor.execute(insert_query, (
@@ -104,32 +124,27 @@ def check_and_create_app_id(data):
                     data['App_Category'], data['App_Size'], data['App_Last_Update'], 
                     data['App_URL'], data['App_Img_Base64'], data['App_Nickname']
                 ))
+
                 app_id = cursor.fetchone()[0]  # Retrieve the new app_id after insertion
                 long_report = 'New URL is added'
-                short_report='Valid'
+                short_report = 'Valid'
+                conn.commit()
+
+
 
             else:
                 long_report = 'URL is valid but this application is not related to Financial Applications'
-                short_report = 'Irrilavant'
-        conn.commit()
-        # Reset the sequence after insert to ensure sequential IDs
-        
-        reset_query = """
-        SELECT setval(pg_get_serial_sequence('app_info', 'app_id'), COALESCE(MAX(app_id), 1)) FROM app_info;
-        """
-        cursor.execute(reset_query)
-        conn.commit()
-        
+                short_report = 'Irrelevant'
+
         cursor.close()
         conn.close()
 
-    
     except Exception as e:
-            print(f"Error happened: {e}")
-            long_report = 'Something happened. Check the connection or validity of URL'
-            short_report = 'Connection-Error'
+        print(f"Error happened: {e}")
+        long_report = 'Something happened. Check the connection or validity of URL'
+        short_report = 'Connection-Error'
 
-    return [long_report,short_report]
+    return [long_report, short_report]
 
 
 
@@ -213,6 +228,8 @@ def give_information_app(app_nickname, url):
 
         App_Img_Base64 = convert_image_to_base64(App_Img)
 
+        app_package_name = extract_app_package_name(url)
+
         APP_INFO = {
             'App_Name': App_Name,
             'App_Img': App_Img,
@@ -226,7 +243,7 @@ def give_information_app(app_nickname, url):
             'App_Last_Update': App_Last_Update,
             'App_URL': url,
             'App_Img_Base64': App_Img_Base64,
-            'App_Nickname' : app_nickname
+            'App_Nickname' : app_package_name[0]
         }
     except Exception as e:
         print(f"Error extracting app details: {e}")
