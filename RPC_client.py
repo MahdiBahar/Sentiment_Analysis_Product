@@ -57,12 +57,18 @@ def start_and_track_task(method, params=None):
         print(f"Error in {method}: {e}")
 
 
+crawl_url = 'https://cafebazaar.ir/app/ir.tes.sarmayeh?l=fa'
+
+
 if __name__ == "__main__":
-    app_ids = [1,2,3,4,5]  # Example app IDs
+    # app_ids = [1,2,3,4,5]  # Example app IDs
 
-    print("Starting crawl_comment task...")
-    start_and_track_task("crawl_comment", {"app_ids": app_ids})
+    # print("Starting crawl_comment task...")
+    # start_and_track_task("crawl_comment", {"app_ids": app_ids})
 
-    print("\nStarting sentiment_analysis task...")
-    start_and_track_task("sentiment_analysis", {"app_ids": app_ids})
+    # print("\nStarting sentiment_analysis task...")
+    # start_and_track_task("sentiment_analysis", {"app_ids": app_ids})
+    result_check_add_url = make_request("check_add_url",{"crawl_url": crawl_url})
+    print(f"Result of check url to add or ignore is that {result_check_add_url}")
+
 
