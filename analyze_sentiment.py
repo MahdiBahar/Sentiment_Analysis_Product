@@ -1,9 +1,9 @@
 # Import libraries
-import psycopg2
-import os
 from transformers import MT5ForConditionalGeneration, MT5Tokenizer, pipeline
 import time
 from googletrans import Translator
+# Connect to database
+from connect_to_database_func import connect_db
 from dotenv import load_dotenv
 
 # Load environment variables from .env file
@@ -30,18 +30,6 @@ SENTIMENT_SCORES = {
     "very positive": 2,
     "no sentiment expressed": 0
 }
-
-# Database connection
-def connect_db():
-    conn = psycopg2.connect(
-        host=os.getenv("DB_HOST"),
-        database=os.getenv("DB_NAME"),
-        user=os.getenv("DB_USER"),
-        password=os.getenv("DB_PASS"),
-        port=os.getenv("DB_PORT")
-    )
-    return conn
-
 
 # Fetch comments that need sentiment analysis for a specific app
 def fetch_comments_to_analyze(app_id):

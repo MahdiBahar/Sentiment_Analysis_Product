@@ -1,5 +1,4 @@
 # Import libraries
-import psycopg2
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.common.by import By
@@ -8,12 +7,13 @@ from selenium.webdriver.support import expected_conditions as EC
 from datetime import datetime
 from persiantools.jdatetime import JalaliDate
 import time
-import os
-# to solve time out problem
+# To solve time out problem
 from tenacity import retry, wait_exponential, stop_after_attempt
 from selenium.common.exceptions import TimeoutException
-#convert to base64
+# Convert to base64
 from convert_image_to_base64 import convert_image_to_base64
+# Connect to database
+from connect_to_database_func import connect_db
 from dotenv import load_dotenv
 # Load environment variables from .env file
 load_dotenv()
@@ -28,17 +28,6 @@ def convert_to_jalali(gregorian_date):
         print(f"Error converting date {gregorian_date}: {e}")
         return None
 
-
-# Database connection function
-def connect_db():
-    conn = psycopg2.connect(
-        host=os.getenv("DB_HOST"),
-        database=os.getenv("DB_NAME"),
-        user=os.getenv("DB_USER"),
-        password=os.getenv("DB_PASS"),
-        port=os.getenv("DB_PORT")
-    )
-    return conn
 
 # Function to get URLs from the `app_info` table
 def fetch_urls_to_crawl():

@@ -1,5 +1,4 @@
 # Import libraries
-import psycopg2
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.common.by import By
@@ -10,27 +9,16 @@ import time
 from persiantools.jdatetime import JalaliDate
 from tqdm import tqdm
 from datetime import datetime
-import os
 import random
-# to solve timeout problem
+# To solve timeout problem
 from tenacity import retry, wait_exponential, stop_after_attempt
+# Connect to database
+from connect_to_database_func import connect_db
 from selenium.common.exceptions import TimeoutException
 from dotenv import load_dotenv
 
 # Load environment variables from .env file
 load_dotenv()
-
-# Database connection function
-def connect_db():
-    """Connect to the PostgreSQL database."""
-    conn = psycopg2.connect(
-        host=os.getenv("DB_HOST"),
-        database=os.getenv("DB_NAME"),
-        user=os.getenv("DB_USER"),
-        password=os.getenv("DB_PASS"),
-        port=os.getenv("DB_PORT")
-    )
-    return conn
 
 
 def convert_to_jalali(gregorian_date):
