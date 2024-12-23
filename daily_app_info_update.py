@@ -3,13 +3,15 @@ import time
 import logging
 from datetime import datetime
 from tenacity import retry, wait_exponential, stop_after_attempt
-from app_scraper_logging import fetch_urls_to_crawl, convert_to_jalali, give_information_app, get_or_create_app_id, log_scrape
+from app_scraper_logging import fetch_urls_to_crawl, give_information_app, get_or_create_app_id, log_scrape
+# Convert to jalali
+from convert_to_jalali_func import convert_to_jalali
 # Setup logging
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(message)s")
 
 # Define the time to run
-SCHEDULED_HOUR = 12
-SCHEDULED_MINUTE = 52
+SCHEDULED_HOUR = 20
+SCHEDULED_MINUTE = 10
 
 # Retry decorator for handling transient errors in scraping
 @retry(wait=wait_exponential(multiplier=1, min=4, max=10), stop=stop_after_attempt(3), reraise=True)

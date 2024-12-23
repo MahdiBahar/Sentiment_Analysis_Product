@@ -1,8 +1,6 @@
 from jsonrpc import JSONRPCResponseManager, dispatcher
 from http.server import BaseHTTPRequestHandler, HTTPServer
 import threading
-import time
-import uuid
 from comment_scraper import fetch_app_urls_to_crawl, crawl_comments
 from app_scraper_check import give_information_app, check_and_create_app_id
 from analyze_sentiment import analyze_and_update_sentiment, fetch_comments_to_analyze

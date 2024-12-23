@@ -6,7 +6,6 @@ from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.chrome.service import Service
 import time
-from persiantools.jdatetime import JalaliDate
 from tqdm import tqdm
 from datetime import datetime
 import random
@@ -14,24 +13,13 @@ import random
 from tenacity import retry, wait_exponential, stop_after_attempt
 # Connect to database
 from connect_to_database_func import connect_db
+# Convert to jalali
+from convert_to_jalali_func import convert_to_jalali
 from selenium.common.exceptions import TimeoutException
 from dotenv import load_dotenv
 
 # Load environment variables from .env file
 load_dotenv()
-
-
-def convert_to_jalali(gregorian_date):
-    """Convert a Gregorian date to Jalali date in YYYYMMDD integer format."""
-    try:
-        if isinstance(gregorian_date, str):
-            gregorian_date = datetime.strptime(gregorian_date, "%Y-%m-%d").date()
-        jalali_date = JalaliDate(gregorian_date)
-        return int(jalali_date.strftime("%Y%m%d"))
-    except Exception as e:
-        print(f"Error converting date {gregorian_date}: {e}")
-        return None
-
 
 
 def save_details_to_app_info(app_id, count_scraped_comments, count_new_comments, comment_scraped_time):

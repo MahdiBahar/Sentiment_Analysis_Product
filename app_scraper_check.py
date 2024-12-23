@@ -4,8 +4,6 @@ from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
-from datetime import datetime
-from persiantools.jdatetime import JalaliDate
 import time
 #convert to base64
 from convert_image_to_base64 import convert_image_to_base64
@@ -36,17 +34,6 @@ def extract_app_package_name(url):
         return None, "url-error"
 
     
-
-def convert_to_jalali(gregorian_date):
-    try:
-        if isinstance(gregorian_date, str):
-            gregorian_date = datetime.strptime(gregorian_date, "%Y-%m-%d").date()
-        jalali_date = JalaliDate(gregorian_date)
-        return int(jalali_date.strftime("%Y%m%d"))
-    except Exception as e:
-        print(f"Error converting date {gregorian_date}: {e}")
-        return None
-
 def check_and_create_app_id(data):
     conn = connect_db()
     cursor = conn.cursor()

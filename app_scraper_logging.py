@@ -4,8 +4,6 @@ from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
-from datetime import datetime
-from persiantools.jdatetime import JalaliDate
 import time
 # To solve time out problem
 from tenacity import retry, wait_exponential, stop_after_attempt
@@ -17,17 +15,6 @@ from connect_to_database_func import connect_db
 from dotenv import load_dotenv
 # Load environment variables from .env file
 load_dotenv()
-
-def convert_to_jalali(gregorian_date):
-    try:
-        if isinstance(gregorian_date, str):
-            gregorian_date = datetime.strptime(gregorian_date, "%Y-%m-%d").date()
-        jalali_date = JalaliDate(gregorian_date)
-        return int(jalali_date.strftime("%Y%m%d"))
-    except Exception as e:
-        print(f"Error converting date {gregorian_date}: {e}")
-        return None
-
 
 # Function to get URLs from the `app_info` table
 def fetch_urls_to_crawl():
