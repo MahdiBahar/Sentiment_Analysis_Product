@@ -9,32 +9,14 @@ from datetime import datetime
 from persiantools.jdatetime import JalaliDate
 import time
 import os
-import base64
-import requests
-from io import BytesIO
 # to solve time out problem
 from tenacity import retry, wait_exponential, stop_after_attempt
 from selenium.common.exceptions import TimeoutException
-
+#convert to base64
+from convert_image_to_base64 import convert_image_to_base64
 from dotenv import load_dotenv
 # Load environment variables from .env file
 load_dotenv()
-
-# Function to download an image and convert it to a base64 string
-def convert_image_to_base64(image_url,last_base_64):
-    try:
-        response = requests.get(image_url)
-        # Check if the request was successful
-        response.raise_for_status()  
-        # Read image data as bytes
-        img_data = BytesIO(response.content)  
-        # Encode to base64 and decode to string
-        base64_img = base64.b64encode(img_data.getvalue()).decode('utf-8')  
-        return base64_img
-    except requests.exceptions.RequestException as e:
-        print(f"Error fetching image from {image_url}: {e}")
-        return last_base_64
-
 
 def convert_to_jalali(gregorian_date):
     try:
@@ -103,31 +85,31 @@ def get_or_create_app_id(data):
             data['App_Category'], data['App_Size'], data['App_Last_Update'], 
             data['App_Img_Base64'], app_id
         ))
+        print(f"Successfully updated app_info for app_id: {app_id}")
     else:
-        
-        print('An error has ecurred')
-    
+        print("Error: App does not exist in the database.")
+    conn.commit()
     cursor.close()
     conn.close()
     return app_id
 
 
 # Function to log each scrape with an explicit scraped_time
-def log_scrape(data, app_id, app_nickname,app_scraped_time, app_scraped_time_jalali):
+def log_scrape(data, app_id, app_nickname, app_scraped_time, app_scraped_time_jalali):
     conn = connect_db()
     cursor = conn.cursor()
     log_query = """
     INSERT INTO log_app (
         app_id, app_name, app_name_company, app_version, app_total_rate, 
         app_average_rate, app_install, app_category, app_size, 
-        app_last_update, app_scraped_time, app_scraped_time_jalali,app_nickname
-    ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s,%s,%s);
+        app_last_update, app_scraped_time, app_scraped_time_jalali, app_nickname
+    ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s);
     """
     cursor.execute(log_query, (
         app_id, data['App_Name'], data['App_Name_Company'], data['App_Version'],
         data['App_Total_Rate'], data['App_Average_Rate'], data['App_Install'],
         data['App_Category'], data['App_Size'], data['App_Last_Update'], 
-        app_scraped_time, app_scraped_time_jalali ,app_nickname
+        app_scraped_time, app_scraped_time_jalali, app_nickname
     ))
 
     conn.commit()
@@ -146,7 +128,7 @@ def load_page(driver, url):
     driver.get(url)
 
 # Function to scrape app information
-def give_information_app(app_name, url, last_base_64):
+def give_information_app(app_id, app_name, url, last_base_64):
     chrome_options = Options()
     chrome_options.add_argument("--headless")
     chrome_options.add_argument("--lang=fa")  
@@ -169,13 +151,6 @@ def give_information_app(app_name, url, last_base_64):
             
             # Wait for the main app details
             wait.until(EC.presence_of_element_located((By.CLASS_NAME, 'AppDetails__col')))
-
-            # Wait for the "Load more" button
-            try:
-                wait.until(EC.presence_of_element_located((By.CLASS_NAME, 'AppCommentsList__loadmore')))
-            except TimeoutException:
-                print(f"'Load more' button not found for {url}. Proceeding without it.")
-            
             App_info_zone = driver.find_element(By.CLASS_NAME, 'AppDetails__col')
             App_Name = App_info_zone.find_element(By.CLASS_NAME, 'AppName').text
 
@@ -202,7 +177,7 @@ def give_information_app(app_name, url, last_base_64):
         driver.quit()
         return None
 
-    # If Persian content was detected, scrape the details
+    # Extract app details
     try:
         App_Name_Company = App_info_zone.find_element(By.CLASS_NAME, 'DetailsPageHeader__company').text
         App_Version = App_info_zone.find_element(By.CLASS_NAME, 'DetailsPageHeader__subtitles').text
@@ -214,8 +189,8 @@ def give_information_app(app_name, url, last_base_64):
         App_Last_Update = App_info_zone.find_elements(By.CLASS_NAME, 'InfoCube__content')[4].text
         App_Img = App_info_zone.find_element(By.TAG_NAME, 'img').get_attribute('src')
 
-        App_Img_Base64 = convert_image_to_base64(App_Img,last_base_64)
-
+        # App_Img_Base64 = convert_image_to_base64(App_Img, last_base_64, app_id)
+        App_Img_Base64 = convert_image_to_base64(App_Img, last_base_64)
         APP_INFO = {
             'App_Name': App_Name,
             'App_Img': App_Img,
@@ -231,7 +206,7 @@ def give_information_app(app_name, url, last_base_64):
             'App_Img_Base64': App_Img_Base64
         }
     except Exception as e:
-        print(f"Error extracting app details: {e}")
+        print(f"Error extracting app details for app_id {app_id}: {e}")
         APP_INFO = None
 
     driver.quit()
