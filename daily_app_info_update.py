@@ -4,7 +4,6 @@ import logging
 from datetime import datetime
 from tenacity import retry, wait_exponential, stop_after_attempt
 from app_scraper_logging import fetch_urls_to_crawl, convert_to_jalali, give_information_app, get_or_create_app_id, log_scrape
-
 # Setup logging
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(message)s")
 

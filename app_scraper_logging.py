@@ -189,7 +189,6 @@ def give_information_app(app_id, app_name, url, last_base_64):
         App_Last_Update = App_info_zone.find_elements(By.CLASS_NAME, 'InfoCube__content')[4].text
         App_Img = App_info_zone.find_element(By.TAG_NAME, 'img').get_attribute('src')
 
-        # App_Img_Base64 = convert_image_to_base64(App_Img, last_base_64, app_id)
         App_Img_Base64 = convert_image_to_base64(App_Img, last_base_64)
         APP_INFO = {
             'App_Name': App_Name,
