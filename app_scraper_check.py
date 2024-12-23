@@ -9,10 +9,8 @@ from datetime import datetime
 from persiantools.jdatetime import JalaliDate
 import time
 import os
-from PIL import Image
-import base64
-import requests
-from io import BytesIO
+#convert to base64
+from convert_image_to_base64 import convert_image_to_base64
 # to solve time out problem
 from tenacity import retry, wait_exponential, stop_after_attempt
 from selenium.common.exceptions import TimeoutException
@@ -37,32 +35,6 @@ def extract_app_package_name(url):
         print(f"An error occurred: {e}")
         return None, "url-error"
 
-
-# Function to download an image and convert it to a base64 string
-def convert_image_to_base64(image_url, size = (32,32)):
-    try:
-        response = requests.get(image_url)
-        # Check if the request was successful
-        response.raise_for_status()
-        # Open the image using Pillow
-        img = Image.open(BytesIO(response.content))  
-
-        # Resize the image
-        img_resized = img.resize(size, Image.Resampling.LANCZOS)
-
-        # Save the resized image to a BytesIO buffer
-        buffer = BytesIO()
-        img_resized.save(buffer, format="PNG")  # Save as PNG or another desired format
-        
-        # Get the base64-encoded string
-        base64_img = base64.b64encode(buffer.getvalue()).decode('utf-8') 
-        return base64_img
-    except requests.exceptions.RequestException as e:
-        print(f"Error fetching image from {image_url}: {e}")
-        return None
-    except Exception as e:
-        print(f"Error processing image: {e}")
-        return None
     
 
 def convert_to_jalali(gregorian_date):

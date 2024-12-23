@@ -57,8 +57,9 @@ def start_and_track_task(method, params=None):
         print(f"Error in {method}: {e}")
 
 
-crawl_url = 'https://cafebazaar.ir/app/ir.tes.sarmayeh?l=fa'
-
+# crawl_url = 'https://cafebazaar.ir/app/com.pmb.mobile'
+crawl_url = 'https://cafebazaar.ir/app/com.bpm.social?l=fa'
+crawl_url = 'https://cafebazaar.ir/app/ir.nasim?l=fa'
 
 if __name__ == "__main__":
     # app_ids = [1,2,3,4,5]  # Example app IDs
