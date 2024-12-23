@@ -9,7 +9,7 @@ import time
 from tenacity import retry, wait_exponential, stop_after_attempt
 from selenium.common.exceptions import TimeoutException
 # Convert to base64
-from convert_image_to_base64 import convert_image_to_base64
+from convert_image_to_base64_func import convert_image_to_base64
 # Connect to database
 from connect_to_database_func import connect_db
 from dotenv import load_dotenv

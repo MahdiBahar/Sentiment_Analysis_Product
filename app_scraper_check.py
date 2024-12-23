@@ -6,7 +6,7 @@ from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 import time
 #convert to base64
-from convert_image_to_base64 import convert_image_to_base64
+from convert_image_to_base64_func import convert_image_to_base64
 # to solve time out problem
 from tenacity import retry, wait_exponential, stop_after_attempt
 from selenium.common.exceptions import TimeoutException
