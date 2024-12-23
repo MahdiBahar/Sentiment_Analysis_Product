@@ -3,9 +3,9 @@ import base64
 import requests
 from io import BytesIO
 
-def convert_image_to_base64(image_url,last_base_64= None):
+def convert_image_to_base64(image_url,last_base_64= None , size_h=32, size_w=32):
     try:
-        image_reduced_size = image_url.split("?")[0]+"?x-img=v1/resize,h_32,w_32,lossless_false/optimize"
+        image_reduced_size = image_url.split("?")[0]+f"?x-img=v1/resize,h_{size_h},w_{size_w},lossless_false/optimize"
         # image_reduced_size = image_url
         response = requests.get(image_reduced_size)
         # Check if the request was successful
