@@ -11,118 +11,122 @@ from datetime import datetime
 import random
 # To solve timeout problem
 from tenacity import retry, wait_exponential, stop_after_attempt
+from selenium.common.exceptions import TimeoutException
 # Connect to database
 from connect_to_database_func import connect_db
 # Convert to jalali
 from convert_to_jalali_func import convert_to_jalali
-from selenium.common.exceptions import TimeoutException
+from logging_config import setup_logger
 from dotenv import load_dotenv
 
 # Load environment variables from .env file
 load_dotenv()
 
+# Setup logger
+logger = setup_logger('comment_scraper', 'comment_scraper.log')
 
 def save_details_to_app_info(app_id, count_scraped_comments, count_new_comments, comment_scraped_time):
-    """
-    Update or insert app information into the app_info table.
-    """
+    """Update or insert app information into the app_info table."""
     conn = connect_db()
     cursor = conn.cursor()
+    try:
+        check_query = "SELECT COUNT(*) FROM public.app_info WHERE app_id = %s;"
+        cursor.execute(check_query, (app_id,))
+        exists = cursor.fetchone()[0] > 0
 
-    # Check if the app_id exists
-    check_query = "SELECT COUNT(*) FROM public.app_info WHERE app_id = %s;"
-    cursor.execute(check_query, (app_id,))
-    exists = cursor.fetchone()[0] > 0
-
-    if exists:
-        # Update the record if app_id exists
-        update_query = """
-        UPDATE public.app_info
-        SET count_scraped_comments = %s,
-            count_new_comments = %s,
-            last_update_comment_scraping = %s
-        WHERE app_id = %s;
-        """
-        cursor.execute(update_query, (count_scraped_comments, count_new_comments, comment_scraped_time, app_id))
-    else:
-        # Insert a new record if app_id does not exist
-        insert_query = """
-        INSERT INTO public.app_info (app_id, count_scraped_comments, count_new_comments, last_update_comment_scraping)
-        VALUES (%s, %s, %s, %s);
-        """
-        cursor.execute(insert_query, (app_id, count_scraped_comments, count_new_comments, comment_scraped_time))
-
-    conn.commit()
-    cursor.close()
-    conn.close()
+        if exists:
+            update_query = """
+            UPDATE public.app_info
+            SET count_scraped_comments = %s,
+                count_new_comments = %s,
+                last_update_comment_scraping = %s
+            WHERE app_id = %s;
+            """
+            cursor.execute(update_query, (count_scraped_comments, count_new_comments, comment_scraped_time, app_id))
+            logger.info(f"Updated app_info for app_id {app_id} with {count_scraped_comments} total and {count_new_comments} new comments.")
+        else:
+            insert_query = """
+            INSERT INTO public.app_info (app_id, count_scraped_comments, count_new_comments, last_update_comment_scraping)
+            VALUES (%s, %s, %s, %s);
+            """
+            cursor.execute(insert_query, (app_id, count_scraped_comments, count_new_comments, comment_scraped_time))
+            logger.info(f"Inserted new record into app_info for app_id {app_id}.")
+        conn.commit()
+    except Exception as e:
+        logger.error(f"Error updating app_info for app_id {app_id}: {e}", exc_info=True)
+    finally:
+        cursor.close()
+        conn.close()
 
 
-# Fetch app_ids and app_urls from the app_info table
 def fetch_app_urls_to_crawl(app_ids=None):
     """Fetch app IDs and URLs to crawl from the app_info table."""
     conn = connect_db()
     cursor = conn.cursor()
-    if app_ids:
-        query = """SELECT app_id, app_url FROM public.app_info WHERE app_id = ANY(%s)
+    try:
+        if app_ids:
+            query = """SELECT app_id, app_url FROM public.app_info WHERE app_id = ANY(%s) AND active = TRUE AND deleted = FALSE"""
+            cursor.execute(query, (app_ids,))
+        else:
+            query = "SELECT app_id, app_url FROM public.app_info"
+            cursor.execute(query)
+        apps = cursor.fetchall()
+        logger.info(f"Fetched {len(apps)} apps to crawl.")
+        return apps
+    except Exception as e:
+        logger.error(f"Error fetching app URLs to crawl: {e}", exc_info=True)
+        return []
+    finally:
+        cursor.close()
+        conn.close()
 
-        AND active = TRUE AND deleted = FALSE
 
-        """
-        cursor.execute(query, (app_ids,))
-    else:
-        query = "SELECT app_id , app_url FROM public.app_info"
-        cursor.execute(query)
-
-
-    apps = cursor.fetchall()
-    cursor.close()
-    conn.close()
-    return apps
-
-
-# Function to save comments in batches with uniqueness enforced on `comment_idd`
 def save_comments_to_db(comments):
-    """
-    Save comments in the database, ensuring uniqueness on `comment_idd`.
-    Returns the count of new comments inserted.
-    """
+    """Save comments in the database, ensuring uniqueness on `comment_idd`."""
     if not comments:
-        return 0  # Return 0 if no comments to insert
+        logger.warning("No comments to insert.")
+        return 0
 
     conn = connect_db()
     cursor = conn.cursor()
-    insert_query = """
-    INSERT INTO public.comment (app_id, user_name, comment_text, comment_rating, comment_date, second_model_processed, comment_idd, comment_date_jalali)
-    VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
-    ON CONFLICT (comment_idd) DO NOTHING;
-    """
-    cursor.executemany(insert_query, comments)
-    new_comments_count = cursor.rowcount  # Count the number of new rows inserted
-    conn.commit()
+    try:
+        insert_query = """
+        INSERT INTO public.comment (app_id, user_name, comment_text, comment_rating, comment_date, second_model_processed, comment_idd, comment_date_jalali)
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+        ON CONFLICT (comment_idd) DO NOTHING;
+        """
+        cursor.executemany(insert_query, comments)
+        new_comments_count = cursor.rowcount
+        conn.commit()
 
-    # Reset the sequence after insert to ensure sequential IDs
-    reset_query = """
-    SELECT setval(pg_get_serial_sequence('public.comment', 'comment_id'), COALESCE(MAX(comment_id), 1)) FROM public.comment;
-    """
-    cursor.execute(reset_query)
-    conn.commit()
-    
-    cursor.close()
-    conn.close()
-    return new_comments_count  # Return the count of new comments
+        reset_query = """
+        SELECT setval(pg_get_serial_sequence('public.comment', 'comment_id'), COALESCE(MAX(comment_id), 1)) FROM public.comment;
+        """
+        cursor.execute(reset_query)
+        conn.commit()
+        logger.info(f"Inserted {new_comments_count} new comments into the database.")
+        return new_comments_count
+    except Exception as e:
+        logger.error("Error inserting comments into the database.", exc_info=True)
+        return 0
+    finally:
+        cursor.close()
+        conn.close()
 
 
-# Retry with exponential backoff for driver.get
 @retry(wait=wait_exponential(multiplier=1, min=4, max=10), stop=stop_after_attempt(3), reraise=True)
 def load_page(driver, url):
     """Load a page with retries."""
-    driver.get(url)
+    try:
+        driver.get(url)
+        logger.info(f"Successfully loaded page: {url}")
+    except Exception as e:
+        logger.error(f"Error loading page {url}: {e}", exc_info=True)
+        raise
 
 
 def crawl_comments(app_id, app_url):
-    """
-    Crawl comments for a specific app.
-    """
+    """Crawl comments for a specific app."""
     chrome_options = Options()
     chrome_options.add_argument("--headless")
     chrome_options.add_argument("--lang=fa")
@@ -142,10 +146,10 @@ def crawl_comments(app_id, app_url):
     try:
         load_page(driver, app_url.split('?l=')[0] + '?l=en')
     except TimeoutException:
-        print(f"Failed to load the page for app ID {app_id} after retries.")
+        logger.error(f"Timeout while loading page for app_id {app_id}.")
         driver.quit()
         return
-    
+
     wait = WebDriverWait(driver, 10)
     
     # Scroll down to load initial comments
@@ -172,34 +176,22 @@ def crawl_comments(app_id, app_url):
         if click_count < 126:
             break
 
-    # Extract comments after all clicks are complete
-    print(f"Scraping comments for app ID {app_id}...")
+    logger.info(f"Scraping comments for app_id {app_id}.")
     comments_elements = driver.find_elements(By.CLASS_NAME, 'AppComment')
-    print(f"Found {len(comments_elements)} comments for app ID {app_id}.")
+    logger.info(f"Found {len(comments_elements)} comments for app_id {app_id}.")
 
     count_scraped_comments = len(comments_elements)
     scraped_time_now = datetime.now().strftime("%Y-%m-%d")
     comment_scraped_time = convert_to_jalali(scraped_time_now)
 
-
     comments_data = []
-    for comment in tqdm(comments_elements):
+    for comment in tqdm(comments_elements, desc="Processing comments"):
         try:
             username = comment.find_element(By.CLASS_NAME, 'AppComment__username').text
             comment_text = comment.find_element(By.CLASS_NAME, 'AppComment__body').text
             date = comment.find_element(By.CLASS_NAME, 'AppComment__meta').text
-
-            try:
-                comment_idd = int(comment.get_attribute('id'))
-            except ValueError as e:
-                print(f"Failed to convert comment ID to integer: {e}")
-                continue
-
-            try:
-                rating = int(comment.find_element(By.CLASS_NAME, 'rating__fill').get_attribute('style').split()[1].split('%')[0]) / 20
-            except:
-                rating = None
-
+            comment_idd = int(comment.get_attribute('id'))
+            rating = int(comment.find_element(By.CLASS_NAME, 'rating__fill').get_attribute('style').split()[1].split('%')[0]) / 20
             try:
                 converted_date = datetime.strptime(date, "%Y/%m/%d").strftime("%Y-%m-%d")
                 comment_date_jalali = convert_to_jalali(converted_date)
@@ -207,11 +199,10 @@ def crawl_comments(app_id, app_url):
                 converted_date = datetime.now().strftime("%Y-%m-%d")
                 comment_date_jalali = convert_to_jalali(converted_date)
 
-            comments_data.append((app_id, username, comment_text, rating, converted_date, False, comment_idd,comment_date_jalali))
+            comments_data.append((app_id, username, comment_text, rating, converted_date, False, comment_idd, comment_date_jalali))
         except Exception as e:
-            print(f"Error processing a comment for app ID {app_id}: {e}")
+            logger.error(f"Error processing comment for app_id {app_id}: {e}", exc_info=True)
 
     new_comments_count = save_comments_to_db(comments_data)
     save_details_to_app_info(app_id, count_scraped_comments, new_comments_count, comment_scraped_time)
-
     driver.quit()
