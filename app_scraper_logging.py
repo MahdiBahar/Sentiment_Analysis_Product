@@ -13,84 +13,96 @@ from convert_image_to_base64_func import convert_image_to_base64
 # Connect to database
 from connect_to_database_func import connect_db
 from dotenv import load_dotenv
+from logging_config import setup_logger
+
 # Load environment variables from .env file
 load_dotenv()
 
-# Function to get URLs from the `app_info` table
+# Setup logger
+logger = setup_logger('app_scraper_logging', 'app_scraper_logging.log')
+
 def fetch_urls_to_crawl():
+    """Fetch app URLs to crawl from the app_info table."""
     conn = connect_db()
     cursor = conn.cursor()
-    cursor.execute("""SELECT app_id, app_nickname, app_url, app_img_base64 FROM public.app_info
-                   WHERE deleted = FALSE
-                   """)
-    urls = cursor.fetchall()
-    cursor.close()
-    conn.close()
-    return urls
+    try:
+        query = """SELECT app_id, app_nickname, app_url, app_img_base64 FROM public.app_info WHERE deleted = FALSE"""
+        cursor.execute(query)
+        urls = cursor.fetchall()
+        logger.info(f"Fetched {len(urls)} URLs to crawl.")
+        return urls
+    except Exception as e:
+        logger.error(f"Error fetching URLs to crawl: {e}", exc_info=True)
+        return []
+    finally:
+        cursor.close()
+        conn.close()
 
 
 def get_or_create_app_id(data):
+    """Update or create app entry in app_info."""
     conn = connect_db()
     cursor = conn.cursor()
 
-    # Check if app already exists in app_info
-    select_query = "SELECT app_id FROM app_info WHERE app_name = %s;"
-    cursor.execute(select_query, (data['App_Name'],))
-    result = cursor.fetchone()
+    try:
+        select_query = "SELECT app_id FROM app_info WHERE app_name = %s;"
+        cursor.execute(select_query, (data['App_Name'],))
+        result = cursor.fetchone()
 
-    if result:
-        # App exists, update the details in app_info
-        app_id = result[0]
-        update_query = """
-        UPDATE app_info
-        SET app_img = %s,
-            app_name_company = %s,
-            app_version = %s,
-            app_total_rate = %s,
-            app_average_rate = %s,
-            app_install = %s,
-            app_category = %s,
-            app_size = %s,
-            app_last_update = %s,
-            app_img_base64 = %s
-        WHERE app_id = %s;
-        """
-        cursor.execute(update_query, (
-            data['App_Img'], data['App_Name_Company'], data['App_Version'],
-            data['App_Total_Rate'], data['App_Average_Rate'], data['App_Install'],
-            data['App_Category'], data['App_Size'], data['App_Last_Update'], 
-            data['App_Img_Base64'], app_id
-        ))
-        print(f"Successfully updated app_info for app_id: {app_id}")
-    else:
-        print("Error: App does not exist in the database.")
-    conn.commit()
-    cursor.close()
-    conn.close()
-    return app_id
+        if result:
+            app_id = result[0]
+            update_query = """
+            UPDATE app_info
+            SET app_img = %s, app_name_company = %s, app_version = %s, 
+                app_total_rate = %s, app_average_rate = %s, app_install = %s, 
+                app_category = %s, app_size = %s, app_last_update = %s, 
+                app_img_base64 = %s
+            WHERE app_id = %s;
+            """
+            cursor.execute(update_query, (
+                data['App_Img'], data['App_Name_Company'], data['App_Version'],
+                data['App_Total_Rate'], data['App_Average_Rate'], data['App_Install'],
+                data['App_Category'], data['App_Size'], data['App_Last_Update'],
+                data['App_Img_Base64'], app_id
+            ))
+            logger.info(f"Successfully updated app_info for app_id {app_id}.")
+        else:
+            logger.error(f"App does not exist in the database for {data['App_Name']}.")
+        conn.commit()
+        return app_id
+    except Exception as e:
+        logger.error(f"Error in get_or_create_app_id: {e}", exc_info=True)
+        return None
+    finally:
+        cursor.close()
+        conn.close()
 
 
-# Function to log each scrape with an explicit scraped_time
 def log_scrape(data, app_id, app_nickname, app_scraped_time, app_scraped_time_jalali):
+    """Log each scrape into the log_app table."""
     conn = connect_db()
     cursor = conn.cursor()
-    log_query = """
-    INSERT INTO log_app (
-        app_id, app_name, app_name_company, app_version, app_total_rate, 
-        app_average_rate, app_install, app_category, app_size, 
-        app_last_update, app_scraped_time, app_scraped_time_jalali, app_nickname
-    ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s);
-    """
-    cursor.execute(log_query, (
-        app_id, data['App_Name'], data['App_Name_Company'], data['App_Version'],
-        data['App_Total_Rate'], data['App_Average_Rate'], data['App_Install'],
-        data['App_Category'], data['App_Size'], data['App_Last_Update'], 
-        app_scraped_time, app_scraped_time_jalali, app_nickname
-    ))
-
-    conn.commit()
-    cursor.close()
-    conn.close()
+    try:
+        log_query = """
+        INSERT INTO log_app (
+            app_id, app_name, app_name_company, app_version, app_total_rate, 
+            app_average_rate, app_install, app_category, app_size, 
+            app_last_update, app_scraped_time, app_scraped_time_jalali, app_nickname
+        ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s);
+        """
+        cursor.execute(log_query, (
+            app_id, data['App_Name'], data['App_Name_Company'], data['App_Version'],
+            data['App_Total_Rate'], data['App_Average_Rate'], data['App_Install'],
+            data['App_Category'], data['App_Size'], data['App_Last_Update'],
+            app_scraped_time, app_scraped_time_jalali, app_nickname
+        ))
+        conn.commit()
+        logger.info(f"Logged scrape for app_id {app_id}.")
+    except Exception as e:
+        logger.error(f"Error logging scrape for app_id {app_id}: {e}", exc_info=True)
+    finally:
+        cursor.close()
+        conn.close()
 
 
 # Function to check if text contains Persian characters
@@ -101,17 +113,24 @@ def is_persian(text):
 # Retry with exponential backoff for driver.get
 @retry(wait=wait_exponential(multiplier=1, min=4, max=10), stop=stop_after_attempt(3), reraise=True)
 def load_page(driver, url):
-    driver.get(url)
+    """Load a webpage with retries."""
+    try:
+        driver.get(url)
+        logger.info(f"Page loaded successfully: {url}")
+    except Exception as e:
+        logger.error(f"Error loading page: {url}: {e}", exc_info=True)
+        raise
 
-# Function to scrape app information
+
 def give_information_app(app_id, app_name, url, last_base_64):
+    """Scrape app information from the given URL."""
     chrome_options = Options()
     chrome_options.add_argument("--headless")
-    chrome_options.add_argument("--lang=fa")  
+    chrome_options.add_argument("--lang=fa")
     chrome_options.add_argument("--no-sandbox")
     chrome_options.add_argument("--disable-dev-shm-usage")
     chrome_options.add_argument("--disable-cache")
-    chrome_options.add_argument("--incognito")  
+    chrome_options.add_argument("--incognito")
 
     driver = webdriver.Chrome(options=chrome_options)
     # Set a longer page load timeout
@@ -131,29 +150,22 @@ def give_information_app(app_id, app_name, url, last_base_64):
             App_Name = App_info_zone.find_element(By.CLASS_NAME, 'AppName').text
 
             if is_persian(App_Name):
-                print("App information loaded in Persian.")
+                logger.info("App information loaded in Persian.")
                 break
             else:
-                print("App information is in English; retrying...")
+                logger.warning("App information in English. Retrying...")
                 retry_count += 1
                 time.sleep(2)
                 driver.refresh()
-
-        except TimeoutException as e:
-            print(f"Timeout error while loading {url}: {e}")
-            retry_count += 1
-            continue
         except Exception as e:
-            print(f"Error loading app details for {url}: {e}")
+            logger.error(f"Error during scraping attempt: {e}", exc_info=True)
             retry_count += 1
-            continue
 
     if retry_count == max_retries:
-        print(f"Failed to load Persian information for {url} after several attempts.")
+        logger.error(f"Failed to scrape app details after {max_retries} retries.")
         driver.quit()
         return None
 
-    # Extract app details
     try:
         App_Name_Company = App_info_zone.find_element(By.CLASS_NAME, 'DetailsPageHeader__company').text
         App_Version = App_info_zone.find_element(By.CLASS_NAME, 'DetailsPageHeader__subtitles').text
@@ -180,8 +192,9 @@ def give_information_app(app_id, app_name, url, last_base_64):
             'App_URL': url,
             'App_Img_Base64': App_Img_Base64
         }
+        # logger.info(f"Scraped data: {APP_INFO}")
     except Exception as e:
-        print(f"Error extracting app details for app_id {app_id}: {e}")
+        logger.error(f"Error extracting app details for app_id {app_id}: {e}", exc_info=True)
         APP_INFO = None
 
     driver.quit()
