@@ -58,11 +58,12 @@ def start_and_track_task(method, params=None):
 
 
 # crawl_url = 'https://cafebazaar.ir/app/com.pmb.mobile'
-crawl_url = 'https://cafebazaar.ir/app/com.bpm.social?l=fa'
-crawl_url = 'https://cafebazaar.ir/app/ir.nasim?l=fa'
+# crawl_url = 'https://cafebazaar.ir/app/com.bpm.social?l=fa'
+crawl_url = 'https://cafebazaar.ir/app/ir.divar'
+# crawl_url = 'https://cafebazaar.ir/app/ir.nasim?l=fa'
 
 if __name__ == "__main__":
-    # app_ids = [1,2,3,4,5]  # Example app IDs
+    # app_ids = [8]  # Example app IDs
 
     # print("Starting crawl_comment task...")
     # start_and_track_task("crawl_comment", {"app_ids": app_ids})
