@@ -89,7 +89,7 @@ def run_model(context, text_b="نظر شما چیست", **generator_args):
         logger.info(f"MT5 model output: {output[0]}")
         return output[0]
     except Exception as e:
-        logger.error(f"Error in run_model: {e}", exc_info=True)
+        logger.error(f"Error in run_model: {e}", exc_info=False)
         return "no sentiment expressed"
 
 def run_second_model(comment_text):
@@ -106,7 +106,7 @@ def run_second_model(comment_text):
         logger.info(f"Second model output: {result[0]['label']}")
         return result[0]["label"]
     except Exception as e:
-        logger.error(f"Error in run_second_model: {e}", exc_info=True)
+        logger.error(f"Error in run_second_model: {e}", exc_info=False)
         return "no sentiment expressed"
 
 # Validate sentiment result and assign score

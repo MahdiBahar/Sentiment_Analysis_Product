@@ -118,7 +118,7 @@ def load_page(driver, url):
         driver.get(url)
         logger.info(f"Page loaded successfully: {url}")
     except Exception as e:
-        logger.error(f"Error loading page: {url}: {e}", exc_info=True)
+        logger.error(f"Error loading page: {url}: {e}", exc_info=False)
         raise
 
 
@@ -158,7 +158,7 @@ def give_information_app(app_id, app_name, url, last_base_64):
                 time.sleep(2)
                 driver.refresh()
         except Exception as e:
-            logger.error(f"Error during scraping attempt: {e}", exc_info=True)
+            logger.error(f"Error during scraping attempt: {e}", exc_info=False)
             retry_count += 1
 
     if retry_count == max_retries:
