@@ -12,17 +12,20 @@ You can find the structure of the project in Wiki!
 To achieve our goals, we have implemented the following steps:
 
 ### 1. Data Collection: Scraping Comments from Café Bazaar
-We use Selenium to scrape user comments from Café Bazaar, a popular application marketplace.
+We use Selenium to scrape user comments from Café Bazaar, a popular application marketplace. This allows us to collect real-time customer feedback for analysis.
 
 ### 2. Database Implementation
-A PostgreSQL database is used to store and manage the collected data efficiently.
-
+A PostgreSQL database is used to store and manage the collected data efficiently. The database structure is designed to handle:  
+- App information (name, ratings, category, etc.)  
+- User comments (text, sentiment, timestamps)  
+- Logging and tracking updates  
 ### 3. Text Preprocessing
-We apply various preprocessing steps, including:
+To improve data quality and ensure accurate analysis, we apply various preprocessing steps, including:
 
-#### * Date Conversion: Converting Georgian dates to Jalali for better front-end usability.
-#### * Text Cleaning: Removing unnecessary characters and normalizing Persian text.
-#### * Encoding Images: Saving images as Base64 format for optimized storage.
+📅 Date Conversion: Converting Georgian dates to Jalali for better front-end usability.  
+📝 Text Cleaning: Removing unnecessary characters and normalizing Persian text.  
+🖼️ Encoding Images: Saving images as Base64 format for optimized storage.  
+
 ### 4. Sentiment Analysis
 For sentiment classification, we utilize Persian NLP models to categorize user comments into six sentiment classes:  
 ✅ Positive  
@@ -34,28 +37,67 @@ For sentiment classification, we utilize Persian NLP models to categorize user c
 
 ### Models Used
 #### "Persiannlp/mt5-base-parsinlu-sentiment-analysis"
-This model is fine-tuned for Persian text sentiment analysis.
-It classifies comments into one of the six sentiment categories above.
+ - This model is fine-tuned for Persian text sentiment analysis.
+ - It classifies comments into one of the six sentiment categories above.
 #### Transformer/DistilBERT (for additional filtering)
-Since the mT5 model struggles to accurately detect "Mixed Sentiment" and "No Sentiment Expressed", we apply a second layer of analysis using DistilBERT.  
-This additional model re-evaluates comments flagged as "Mixed" or "No Sentiment" to refine the classification and improve accuracy.  
-Since Transformer-based models struggle with Persian text, we translate Persian comments to English before applying a second round of classification.  
-By combining these two models, we enhance sentiment detection reliability and minimize misclassification errors.
-### 5. Recommendation System
-We extract useful insights from customer feedback by identifying common complaints and praises. Based on this, the system suggests improvements for banking applications.
+ - Since the mT5 model struggles to accurately detect "Mixed Sentiment" and "No Sentiment Expressed", we apply a second layer of analysis using DistilBERT.  
+ - This additional model re-evaluates comments flagged as "Mixed" or "No Sentiment" to refine the classification and improve accuracy.
+ - Since Transformer-based models struggle with Persian text, we translate Persian comments to English before applying a second round of classification.
 
-### 6. Visualization & Dashboard
-We provide a dashboard to help managers:
+##### By combining these two models, we enhance sentiment detection reliability and minimize misclassification errors.
 
-#### - Track user sentiment trends over time.
-#### - Compare different banking applications.
-#### - Gain actionable insights for decision-making.
+### 5. Daily app update   
+We run a scheduled task to update all existing app information daily. The system:  
 
-## 📊 Dashboard Features  
+ - Checks and collects updated app data automatically.  
+ - Maintains a log table to store historical updates for tracking changes over time.
+### 6.Logging system   
+An organized logging system is implemented to track:  
+
+✅ Tasks (such as scraping and analysis)  
+❗ Errors and warnings  
+🔄 System updates  
+All logs are stored in the logs folder for easy debugging and monitoring.  
+
+### 7. Using RPC (Remote Procedure Call)
+One of the crucial aspects of the project is how the AI engine communicates with the Front-End client.  
+
+ - We use an RPC server for client-server communication.  
+ - This allows real-time task tracking, enabling the client to:  
+ - Monitor task status (e.g., scraping progress).  
+ - Send task requests (e.g., trigger sentiment analysis).  
+
+### 8. Multi-threading
+In some cases, the server is busy processing tasks while the client sends a request to check task status.  
+To avoid blocking requests, we implemented multi-threading, allowing the server to:  
+
+ - Run multiple tasks in parallel.  
+ - Respond to client requests in real-time without delays.  
+
+### 9. Automatic retry & error handling.  
+During scraping and sentiment analysis, various issues such as:  
+
+ - Network failures  
+ - Timeout errors  
+ - Unexpected data formats  
+could interrupt the process. To handle these gracefully, we implemented:  
+ - Retry mechanisms to automatically reattempt failed operations.  
+ - Detailed error logging for debugging and diagnostics.  
+
+### 10. Recommendation System
+We extract useful insights from customer feedback by identifying:  
+ - Common complaints and praises.  
+ - Trends in user sentiment.  
+Based on this, the system suggests improvements for banking applications, helping managers enhance user experience.  
+
+### 11. Visualization & Dashboard
+We provide a dashboard to help managers make better decision.
+####  Dashboard Features  
 📈 Track sentiment trends over time  
 🏦 Compare banking applications  
-📑 Generate reports for managers  
-🔄 View daily scraping status  
+📑 Get sentiment analysis and scrapping whenever the operator wants  
+🔄 View daily scraping status   
+📊 Generate reports for managers  
 
 
 ## Technical Details
@@ -97,26 +139,26 @@ sudo docker-compose logs -f app_scraper
 Since logging is a key feature in your project, here’s a guide to monitoring logs:
 
 Check sentiment analysis logs:  
-```
+```ruby
 tail -f logs/analyze_sentiment.log
 ```
 Check scraper logs:  
-```
+```ruby
 tail -f logs/app_scraper_logging.log
 ```
 Check daily tasks:  
-```
+```ruby
 tail -f logs/daily_task.log
 ```
 ### 🖧 RPC Communication
 The RPC Server allows different components of the system to communicate efficiently.
 
 #### 1️⃣ Start the RPC Server:
-```
+```ruby
 python RPC/RPC_server.py
 ```
 #### 2️⃣ Test with an RPC Client:
-```
+```ruby
 python RPC/RPC_client.py
 ```
 ## 🤝 Contributing
