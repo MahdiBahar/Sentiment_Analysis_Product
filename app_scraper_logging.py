@@ -26,7 +26,8 @@ def fetch_urls_to_crawl():
     conn = connect_db()
     cursor = conn.cursor()
     try:
-        query = """SELECT app_id, app_nickname, app_url, app_img_base64 FROM public.app_info WHERE deleted = FALSE"""
+        query = """SELECT app_id, app_nickname, app_url, app_img_base64 FROM public.app_info WHERE deleted = FALSE
+        """
         cursor.execute(query)
         urls = cursor.fetchall()
         logger.info(f"Fetched {len(urls)} URLs to crawl.")
@@ -39,14 +40,16 @@ def fetch_urls_to_crawl():
         conn.close()
 
 
-def get_or_create_app_id(data):
+def get_or_create_app_id(data , app_nickname):
     """Update or create app entry in app_info."""
     conn = connect_db()
     cursor = conn.cursor()
 
     try:
-        select_query = "SELECT app_id FROM app_info WHERE app_name = %s;"
-        cursor.execute(select_query, (data['App_Name'],))
+        # select_query = "SELECT app_id FROM app_info WHERE app_name = %s;"
+        # cursor.execute(select_query, (data['App_Name'],))
+        select_query = "SELECT app_id FROM app_info WHERE app_nickname = %s;"
+        cursor.execute(select_query, (str(app_nickname),))
         result = cursor.fetchone()
 
         if result:
