@@ -46,6 +46,7 @@ def get_or_create_app_id(data , app_nickname):
     cursor = conn.cursor()
 
     try:
+        app_id = None
         # select_query = "SELECT app_id FROM app_info WHERE app_name = %s;"
         # cursor.execute(select_query, (data['App_Name'],))
         select_query = "SELECT app_id FROM app_info WHERE app_nickname = %s;"
@@ -141,6 +142,8 @@ def give_information_app(app_id, app_name, url, last_base_64):
 
     retry_count = 0
     max_retries = 5  # Set a limit to retries
+    App_info_zone = None  # Initialize to avoid unbound error
+    App_Name = None  # Ensure App_Name is always defined
 
     while retry_count < max_retries:
         try:
@@ -164,8 +167,11 @@ def give_information_app(app_id, app_name, url, last_base_64):
             logger.error(f"Error during scraping attempt: {e}", exc_info=False)
             retry_count += 1
 
-    if retry_count == max_retries:
-        logger.error(f"Failed to scrape app details after {max_retries} retries.")
+    if retry_count == max_retries or App_info_zone is None:
+        if retry_count == max_retries:
+            logger.error(f"Failed to scrape app details after {max_retries} retries.")
+        else:
+            logger.error("App_info_zone was not set. Exiting function.")
         driver.quit()
         return None
 

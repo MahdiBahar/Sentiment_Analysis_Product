@@ -32,7 +32,8 @@ def save_details_to_app_info(app_id, count_scraped_comments, count_new_comments,
     try:
         check_query = "SELECT COUNT(*) FROM public.app_info WHERE app_id = %s;"
         cursor.execute(check_query, (app_id,))
-        exists = cursor.fetchone()[0] > 0
+        fetch_result = cursor.fetchone()
+        exists = fetch_result is not None and fetch_result[0] > 0
 
         if exists:
             update_query = """
@@ -190,8 +191,23 @@ def crawl_comments(app_id, app_url):
             username = comment.find_element(By.CLASS_NAME, 'AppComment__username').text
             comment_text = comment.find_element(By.CLASS_NAME, 'AppComment__body').text
             date = comment.find_element(By.CLASS_NAME, 'AppComment__meta').text
-            comment_idd = int(comment.get_attribute('id'))
-            rating = int(comment.find_element(By.CLASS_NAME, 'rating__fill').get_attribute('style').split()[1].split('%')[0]) / 20
+            comment_id_str = comment.get_attribute('id')
+            if comment_id_str is not None:
+                comment_idd = int(comment_id_str)
+            else:
+                logger.warning("Comment element missing 'id' attribute; skipping this comment.")
+                continue
+            style_attr = comment.find_element(By.CLASS_NAME, 'rating__fill').get_attribute('style')
+            if style_attr is not None:
+                try:
+                    rating_percent = style_attr.split()[1].split('%')[0]
+                    rating = int(rating_percent) / 20
+                except (IndexError, ValueError):
+                    logger.warning(f"Unexpected style format for rating: '{style_attr}'. Setting rating to 0.")
+                    rating = 0
+            else:
+                logger.warning("No 'style' attribute found for rating. Setting rating to 0.")
+                rating = 0
             try:
                 converted_date = datetime.strptime(date, "%Y/%m/%d").strftime("%Y-%m-%d")
                 comment_date_jalali = convert_to_jalali(converted_date)

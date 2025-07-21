@@ -47,7 +47,7 @@ def start_and_track_task(method, params=None):
             print(f"Task {method} status: {status_result}")
 
             # Stop polling when the task is completed or failed
-            if status_result["status"] in ("completed", "failed"):
+            if status_result and "status" in status_result and status_result["status"] in ("completed", "failed"):
                 break
 
             # Wait before polling again
@@ -63,14 +63,15 @@ crawl_url = 'https://cafebazaar.ir/app/ir.divar'
 # crawl_url = 'https://cafebazaar.ir/app/ir.nasim?l=fa'
 
 if __name__ == "__main__":
-    # app_ids = [8]  # Example app IDs
+    app_ids = [23,24,25,26,27,28,29,30,31,32,33,34,35,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22]  # Example app IDs
+    # app_ids = [28]
+    # app_ids = [8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31,32,33,34,35]
+    print("Starting crawl_comment task...")
+    start_and_track_task("crawl_comment", {"app_ids": app_ids})
 
-    # print("Starting crawl_comment task...")
-    # start_and_track_task("crawl_comment", {"app_ids": app_ids})
-
-    # print("\nStarting sentiment_analysis task...")
-    # start_and_track_task("sentiment_analysis", {"app_ids": app_ids})
-    result_check_add_url = make_request("check_add_url",{"crawl_url": crawl_url})
-    print(f"Result of check url to add or ignore is that {result_check_add_url}")
+    print("\nStarting sentiment_analysis task...")
+    start_and_track_task("sentiment_analysis", {"app_ids": app_ids})
+    # result_check_add_url = make_request("check_add_url",{"crawl_url": crawl_url})
+    # print(f"Result of check url to add or ignore is that {result_check_add_url}")
 
 

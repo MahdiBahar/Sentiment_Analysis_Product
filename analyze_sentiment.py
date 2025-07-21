@@ -21,7 +21,7 @@ model = MT5ForConditionalGeneration.from_pretrained(model_name)
 
 # Load the second model (Hugging Face pipeline)
 logger.info("Loading Hugging Face sentiment classifier...")
-classifier = pipeline("sentiment-analysis")
+classifier = pipeline("sentiment-analysis", device=-1)
 
 # Initialize Google Translator
 translator = Translator()

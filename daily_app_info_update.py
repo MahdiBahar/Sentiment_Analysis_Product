@@ -10,8 +10,8 @@ from logging_config import setup_logger
 logger = setup_logger('daily_task', 'daily_task.log')
 
 # Define the time to run
-SCHEDULED_HOUR = 10
-SCHEDULED_MINUTE = 31
+SCHEDULED_HOUR = 20
+SCHEDULED_MINUTE = 11
 
 @retry(wait=wait_exponential(multiplier=1, min=4, max=10), stop=stop_after_attempt(3), reraise=True)
 def process_app_info(app_id, app_nickname, app_url, last_base_64, app_scraped_time, app_scraped_time_jalali):

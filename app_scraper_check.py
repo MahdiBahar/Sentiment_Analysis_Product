@@ -55,7 +55,7 @@ def check_and_create_app_id(data):
         cursor.execute(select_query, (data['App_Name'], data['App_Nickname']))
         result = cursor.fetchone()
 
-        if result[0]:
+        if result is not None and result[0]:
             
             if result[1]:
                 app_id = result[0]  # Assuming result[0] contains the correct app_id
@@ -120,12 +120,18 @@ def check_and_create_app_id(data):
                     data['App_URL'], data['App_Img_Base64'], data['App_Nickname']
                 ))
 
-                app_id = cursor.fetchone()[0]  # Retrieve the new app_id after insertion
-                long_report = 'New URL is added'
-                short_report = 'Valid'
-                conn.commit()
-                logger.info(f"Added new app with app_id: {app_id}")
-                # return "New app added"
+                fetch_result = cursor.fetchone()
+                if fetch_result is not None:
+                    app_id = fetch_result[0]  # Retrieve the new app_id after insertion
+                    long_report = 'New URL is added'
+                    short_report = 'Valid'
+                    conn.commit()
+                    logger.info(f"Added new app with app_id: {app_id}")
+                    # return "New app added"
+                else:
+                    long_report = 'Failed to retrieve new app_id after insertion'
+                    short_report = 'Insert-Failed'
+                    logger.error("Failed to retrieve new app_id after insertion")
             else:
                 long_report = 'URL is valid but this application is not related to Financial Applications'
                 short_report = 'Irrelevant'
@@ -176,6 +182,8 @@ def give_information_app(app_nickname, url):
 
     retry_count = 0
     max_retries = 5  # Set a limit to retries
+    App_info_zone = None  # Initialize to avoid unbound error
+    App_Name = None       # Ensure App_Name is always defined
 
     while retry_count < max_retries:
         try:
@@ -200,12 +208,14 @@ def give_information_app(app_nickname, url):
             retry_count += 1
             continue
 
-    if retry_count == max_retries:
+    if retry_count == max_retries or App_info_zone is None or App_Name is None:
         logger.error(f"Failed to scrape app details after {max_retries} retries.")
         driver.quit()
         return None
 
+    # Ensure App_info_zone is defined before use
     try:
+        # If the retry loop succeeded, App_info_zone should be defined
         App_Name_Company = App_info_zone.find_element(By.CLASS_NAME, 'DetailsPageHeader__company').text
         App_Version = App_info_zone.find_element(By.CLASS_NAME, 'DetailsPageHeader__subtitles').text
         App_Install = App_info_zone.find_elements(By.CLASS_NAME, 'InfoCube__content')[0].text
