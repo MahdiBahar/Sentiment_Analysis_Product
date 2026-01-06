@@ -1,3 +1,4 @@
+deep_translator
 attrs==24.3.0
 Automat==24.8.1
 certifi==2024.12.14

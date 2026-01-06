@@ -20,3 +20,6 @@ torchaudio
 # python -c "from transformers import MT5ForConditionalGeneration, MT5Tokenizer; \
 #     MT5Tokenizer.from_pretrained('persiannlp/mt5-base-parsinlu-sentiment-analysis'); \
 #     MT5ForConditionalGeneration.from_pretrained('persiannlp/mt5-base-parsinlu-sentiment-analysis')"
+
+
+deep_translator

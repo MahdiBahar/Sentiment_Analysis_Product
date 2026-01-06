@@ -1,7 +1,8 @@
 # Import libraries
 from transformers import MT5ForConditionalGeneration, MT5Tokenizer, pipeline
 import time
-from googletrans import Translator
+# from googletrans import Translator
+from deep_translator import GoogleTranslator
 # Connect to database
 from connect_to_database_func import connect_db
 from dotenv import load_dotenv
@@ -24,8 +25,8 @@ logger.info("Loading Hugging Face sentiment classifier...")
 classifier = pipeline("sentiment-analysis", device=-1)
 
 # Initialize Google Translator
-translator = Translator()
-
+# translator = Translator()
+translator = GoogleTranslator(source="auto", target="en")
 # Sentiment mapping for scoring
 SENTIMENT_SCORES = {
     "very negative": -2,
@@ -95,7 +96,8 @@ def run_model(context, text_b="نظر شما چیست", **generator_args):
 def run_second_model(comment_text):
     try:
         logger.debug(f"Running second model for text: {comment_text}")
-        translated_text = translator.translate(comment_text, dest="en").text
+        # translated_text = translator.translate(comment_text, dest="en").text
+        translated_text = translator.translate(comment_text)
         if not translated_text:
             raise ValueError("Translation returned empty text.")
         
